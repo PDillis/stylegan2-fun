@@ -1,3 +1,41 @@
+# Let's have fun with StyleGAN2!
+
+## Recreating the Projection Videos
+
+To generate your own projection videos [as in the official implementation](https://drive.google.com/open?id=1ZpEiQuUFm4XQRUxoJj3f4O8-f102iXJc), first run:
+
+```
+python run_projector.py project-generated-images --network /path/to/network/pkl --num-snapshots 1000 --seeds ....
+```
+
+where, if you know specific seeds that you wish to project, include it in the argument. To project real images, these must be in a `tfrecord` file, so the easiest thing to do is to use the file you used to train your [StyleGAN](https://github.com/NVlabs/stylegan) or StyleGAN2 model. Then, you must run:
+
+```
+python run_projector.py project-real-images --network /path/to/network/pkl --data-dir /path/to/tfrecord/root/dir --dataset tfrecord_name --num-snapshots 1000 --num-images as-many-as-you-want(int)
+```
+
+Take heed that, if you run the above code, say, two times, with the first time setting `--num-images 5` and the second time setting `--num-images 10`, then the first run will be contained in the second, as they will have the same seed. As such, if you wish to try a specific set of real images from your training data, then simply convert these to a `tfrecord` file with `dataset_tool.py` and you don't have to worry about when you will get the image you want to project.
+
+Note that `--num-snapshots 1000` is required for both for the scripts I will next explain. Modifying this and in turn the length of the projection video is not so complicated, so feel free to modify this, but remember to modify **both** numbers.
+
+After you've done this, simply run, for generated images:
+
+```
+./projecting_generated_video.sh 1
+```
+
+if, for example, your Run #1 is of generated images, i.e., the directory in `results` is `00001-project-generated-images`. The same will be with projecting your real image(s):
+
+```
+./projecting_real_video.sh 2
+```
+
+if your Run #2 is of real images, i.e., the directory in `results` is `00002-project-real-images`.
+
+Henceforth, it will be the official implementation of StyleGAN2, so pay attetion to the official author's notes:
+
+---
+
 ## StyleGAN2 &mdash; Official TensorFlow Implementation
 
 ![Teaser image](./docs/stylegan2-teaser-1024x256.png)
