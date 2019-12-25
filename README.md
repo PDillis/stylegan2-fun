@@ -8,7 +8,9 @@ To generate your own projection videos [as in the official implementation](https
 python run_projector.py project-generated-images --network /path/to/network/pkl --num-snapshots 1000 --seeds ....
 ```
 
-where, if you know specific seeds that you wish to project, include it in the argument. To project real images, these must be in a `tfrecord` file, so the easiest thing to do is to use the file you used to train your [StyleGAN](https://github.com/NVlabs/stylegan) or StyleGAN2 model. Then, you must run:
+where, if you know specific seeds that you wish to project, include it in the argument. To project real images, these must be in a `tfrecord` file, so the easiest thing to do is to use the file you used to train your [StyleGAN](https://github.com/NVlabs/stylegan) or StyleGAN2 model. As a side note, I must put emphasis on the fact that **you can use either a trained model.pkl from StyleGAN or StyleGAN2**, so this projection code can be used for your old StyleGAN models.
+
+Then, you must run:
 
 ```
 python run_projector.py project-real-images --network /path/to/network/pkl --data-dir /path/to/tfrecord/root/dir --dataset tfrecord_name --num-snapshots 1000 --num-images as-many-as-you-want(int)
