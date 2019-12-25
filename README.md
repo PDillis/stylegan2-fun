@@ -14,9 +14,9 @@ where, if you know specific seeds that you wish to project, include it in the ar
 python run_projector.py project-real-images --network /path/to/network/pkl --data-dir /path/to/tfrecord/root/dir --dataset tfrecord_name --num-snapshots 1000 --num-images as-many-as-you-want(int)
 ```
 
-Take heed that, if you run the above code, say, two times, with the first time setting `--num-images 5` and the second time setting `--num-images 10`, then the first run will be contained in the second, as they will have the same seed. As such, if you wish to try a specific set of real images from your training data, then simply convert these to a `tfrecord` file with `dataset_tool.py` and you don't have to worry about when you will get the image you want to project.
+Take heed that, if you run the above code, say, two times, with the first time setting `--num-images 5` and the second time setting `--num-images 10`, then the first run will be contained in the second, as they will have the same seed. As such, if you wish to project a specific set of real images from your training data, then simply convert these to a `tfrecord` file with `dataset_tool.py` and you don't have to worry about when you will get the specific image(s) you want to project.
 
-Note that `--num-snapshots 1000` is required for both for the scripts I will next explain. Modifying this and in turn the length of the projection video is not so complicated, so feel free to modify this, but remember to modify **both** numbers.
+Note that `--num-snapshots 1000` is required for both bash scripts below, as the final video will be of length of 20 seconds, and will run at 50 fps. Modifying this and in turn the length of the projection video is not so complicated, so feel free to so, but remember to modify **both** numbers.
 
 After you've done this, simply run, for generated images:
 
@@ -30,9 +30,9 @@ if, for example, your Run #1 is of generated images, i.e., the directory in `res
 ./projecting_real_video.sh 2
 ```
 
-if your Run #2 is of real images, i.e., the directory in `results` is `00002-project-real-images`.
+if your Run #2 is of real images, i.e., the directory in `results` is `00002-project-real-images`. The result of these two bash scripts will be that your images will be sorted in subdirectories in each run (by either seed or real image number), and a video will be generated in each subdirectory. This video will have, to the right, the target image (be it the generated or real image), and to the left, the progression of the projection, up to iteration 1000 (hence why 1000 snapshots).
 
-Henceforth, it will be the official implementation of StyleGAN2, so pay attetion to the official author's notes:
+Henceforth, it will be the official implementation of StyleGAN2, so pay attention to the official author's notes:
 
 ---
 
