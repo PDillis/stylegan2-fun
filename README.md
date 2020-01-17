@@ -1,3 +1,39 @@
+# Let's have fun with StyleGAN2!
+
+## Recreating the Projection Videos
+
+To generate your own projection videos [as in the official implementation](https://drive.google.com/open?id=1ZpEiQuUFm4XQRUxoJj3f4O8-f102iXJc), first run:
+
+```
+python run_projector.py project-generated-images --network /path/to/network/pkl --num-snapshots 1000 --seeds ....
+```
+
+where, if you know specific seeds that you wish to project, include it in the argument. To project real images, these must be in a `tfrecord` file, so the easiest thing to do is to use the file you used to train your [StyleGAN](https://github.com/NVlabs/stylegan) or StyleGAN2 model. As a side note, I must put emphasis on the fact that **you can use either a trained model.pkl from StyleGAN or StyleGAN2**, so this projection code can be used for your old StyleGAN models.
+
+Then, you must run:
+
+```
+python run_projector.py project-real-images --network /path/to/network/pkl --data-dir /path/to/tfrecord/root/dir --dataset tfrecord_name --num-snapshots 1000 --num-images as-many-as-you-want(int)
+```
+
+Take heed that, if you run the above code, say, two times, with the first time setting `--num-images 5` and the second time setting `--num-images 10`, then the first run will be contained in the second, as they will have the same seed. As such, if you wish to project a specific set of real images from your training data, then simply convert these to a `tfrecord` file with `dataset_tool.py` and you don't have to worry about when you will get the specific image(s) you want to project.
+
+Note that `--num-snapshots 1000` is required for both bash scripts below, as the final video will be of length of 20 seconds, and will run at 50 fps. Modifying this and in turn the length of the projection video is not so complicated, so feel free to so, but remember to modify **both** numbers.
+
+After you've done this, simply run:
+
+```
+./projection_video.sh 1
+```
+
+if, for example, your Run #1 was a projection of real or generated images, i.e., the directory in `results` is `00001-project-generated-images` or `00001-project-real-images`.
+
+The result of this bash script will be that your images will be sorted in subdirectories in each run (by either seed or real image number), and a video will be generated in each subdirectory. This video will have, to the right, the *Target image* (be it generated or real image), and to the left, the progression of the projection at each step, up to iteration 1000 (hence why 1000 snapshots).
+
+Henceforth, it will be the official implementation of StyleGAN2, so pay attention to the official author's notes:
+
+---
+
 ## StyleGAN2 &mdash; Official TensorFlow Implementation
 
 ![Teaser image](./docs/stylegan2-teaser-1024x256.png)
