@@ -13,7 +13,7 @@ NC='\033[0m'
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
-# Check if there are exactly 2 arguments by the user, otherwise, show usage:
+# Check if there are exactly 1 argument by the user, otherwise, show usage:
 if [ $# -ne 1 ] || ! [ "$1" -eq "$1" ] 2> /dev/null; then
 	echo -e "Wrong arguments! Usage: \n\t${BOLD}\$ ./projection_video.sh n${NORMAL} \nwhere ${BOLD}n${NORMAL}, is the run number (an integer: 0, 1, 2, ...)."
 	exit 1
