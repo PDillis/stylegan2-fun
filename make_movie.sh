@@ -5,7 +5,8 @@
 # $1 will be the run number, $2 onwards will be the different images that you have (presumably) run before.
 
 # Run dir:
-printf -v RUN "%05d" "$1"
+NUM=${1?Error: No run number given}
+printf -v RUN "%05d" "$NUM"
 RUN="$PWD"/results/"$RUN"-project-real-images
 
 # Thus, for each image:
@@ -27,5 +28,5 @@ do
 
 	# Delete right and left videos (remove if you want to keep them):
 	rm -f "$RES"/left.mp4 "$RES"/right.mp4
-	
+
 done
