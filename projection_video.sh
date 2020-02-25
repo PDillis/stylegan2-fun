@@ -13,7 +13,7 @@ NC='\033[0m'
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
-# Check if there are exactly 1 argument by the user, otherwise, show usage:
+# Check if there is exactly 1 argument by the user, otherwise, show usage:
 if [ $# -ne 1 ] || ! [ "$1" -eq "$1" ] 2> /dev/null; then
 	echo -e "Wrong arguments! Usage: \n\t${BOLD}\$ ./projection_video.sh n${NORMAL} \nwhere ${BOLD}n${NORMAL}, is the run number (an integer: 0, 1, 2, ...)."
 	exit 1
@@ -22,11 +22,12 @@ fi
 # Run dir:
 printf -v NRUN "%05d" "$1"
 
+# The projection was of either real or generated images, so we will check which
+# of these it actually was:
 REAL="$PWD"/results/"$NRUN"-project-real-images
 GEN="$PWD"/results/"$NRUN"-project-generated-images
 
-# We will check which of these paths actually exist and assign RUN to it; this
-# way, we will avoid having to ask the user to input it:
+# We will check which of these paths actually exist and assign RUN to it:
 if [ -d "$REAL" ]; then
 	RUN="$REAL"
 elif [ -d "$GEN" ]; then
@@ -50,21 +51,23 @@ do
 	mkdir "$RES"
 	mv "$RUN"/"$IMG"*.png "$RES"
 
-	# Number of frames will determine our framerate (default: 1000 frames at 50 fps: 20 second video):
+	# Number of frames will determine our framerate (default: 1000 frames at
+	# 50 fps: 20 second video):
 	NUMFRAMES=$(($(ls -lR "$RES"/*.png | wc -l) - 1)) # we remove the target image
 	FRAMERATE=$(("$NUMFRAMES" / "$DUR"))
 
 	# Make left video, with bottom box printing frame number (can be easily removed):
 	echo -e "\vMaking \vleft \vvideo \vof \v$IMG"
-	ffmpeg -y -framerate "$FRAMERATE" -i "$RES"/"$IMG"-step%04d.png -vf "drawtext=fontfile=DejaVuSansMono.ttf: text='Step\: %{frame_num}': start_number=1: x=(w-tw)/2: y=h-(2*lh): fontcolor=black: fontsize=20: box=1: boxcolor=white: boxborderw=5" -c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p "$RES"/left.mp4
+	ffmpeg -y -framerate "$FRAMERATE" -i "$RES"/"$IMG"-step%04d.png -vf "drawtext=fontfile=DejaVuSansMono.ttf: text='Step\: %{frame_num}': start_number=1: x=(w-tw)/2: y=h-(2*lh): fontcolor=black: fontsize=20: box=1: boxcolor=white: boxborderw=5" -preset veryfast -c:v libx265 -profile:v high -crf 20 -pix_fmt yuv420p "$RES"/left.mp4
 
 	# Make right video of the static target image:
 	echo -e "\vMaking \vright \vvideo \vof \v$IMG"
-	ffmpeg -y -loop 1 -i "$RES"/"$IMG"-target.png -vf "drawtext=fontfile=DejaVuSansMono.ttf: text='Target image': x=(w-tw)/2: y=h-(2*lh): fontcolor=black: fontsize=20: box=1: boxcolor=white: boxborderw=5" -c:v libx264 -t "$DUR" -pix_fmt yuv420p "$RES"/right.mp4
+    TEXT=""$NAME" image"
+	ffmpeg -y -loop 1 -i "$RES"/"$IMG"-target.png -vf "drawtext=fontfile=DejaVuSansMono.ttf: text='Target Image': x=(w-tw)/2: y=h-(2*lh): fontcolor=black: fontsize=20: box=1: boxcolor=white: boxborderw=5" -preset veryfast -c:v libx265 -t "$DUR" -pix_fmt yuv420p "$RES"/right.mp4
 
 	# Combine left and right videos:
 	echo -e "\vCombining \vvideos \vof \v$IMG"
-	ffmpeg -y -i "$RES"/left.mp4 -i "$RES"/right.mp4 -filter_complex '[0:v][1:v]hstack[vid]' -map [vid] -c:v libx264 -crf 20 -preset veryfast "$RES"/"$IMG"-projecting.mp4
+	ffmpeg -y -i "$RES"/left.mp4 -i "$RES"/right.mp4 -filter_complex '[0:v][1:v]hstack[vid]' -map [vid] -c:v libx264 -crf 20 -preset veryfast "$RES"/"$IMG"-projection.mp4
 
 	# Delete right and left videos (remove if you wish to keep them):
 	rm -f "$RES"/left.mp4 "$RES"/right.mp4

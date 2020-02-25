@@ -2,15 +2,19 @@
 
 ## Recreating the Projection Videos
 
-To generate your own projection videos [as in the official implementation](https://drive.google.com/open?id=1ZpEiQuUFm4XQRUxoJj3f4O8-f102iXJc), first run:
+To generate your own projection videos [as in the official implementation](https://drive.google.com/open?id=1ZpEiQuUFm4XQRUxoJj3f4O8-f102iXJc), you must of course have to have a projection in your `results` subdir!
+
+For example, to project generated images by your trained model, run:
 
 ```
 python run_projector.py project-generated-images --network /path/to/network/pkl --num-snapshots 1000 --seeds ....
 ```
 
-where, if you know specific seeds that you wish to project, include it in the argument. To project real images, these must be in a `tfrecord` file, so the easiest thing to do is to use the file you used to train your [StyleGAN](https://github.com/NVlabs/stylegan) or StyleGAN2 model. As a side note, I must put emphasis on the fact that **you can use either a trained model.pkl from StyleGAN or StyleGAN2**, so this projection code can be used for your old StyleGAN models.
+where, if you know specific seeds that you wish to project, include it in the argument.
 
-Then, you must run:
+To project real images, these must be in a `tfrecord` file, so the easiest thing to do is to use the file you used to train your [StyleGAN](https://github.com/NVlabs/stylegan) or StyleGAN2 model (as a side note, I must put emphasis on the fact that **you can use either a trained model.pkl from StyleGAN or StyleGAN2**, so this projection code can be used for your *old* StyleGAN models).
+
+Then, to project real images, run:
 
 ```
 python run_projector.py project-real-images --network /path/to/network/pkl --data-dir /path/to/tfrecord/root/dir --dataset tfrecord_name --num-snapshots 1000 --num-images as-many-as-you-want(int)
@@ -18,17 +22,37 @@ python run_projector.py project-real-images --network /path/to/network/pkl --dat
 
 Take heed that, if you run the above code, say, two times, with the first time setting `--num-images 5` and the second time setting `--num-images 10`, then the first run will be contained in the second, as they will have the same seed. As such, if you wish to project a specific set of real images from your training data, then simply convert these to a `tfrecord` file with `dataset_tool.py` and you don't have to worry about when you will get the specific image(s) you want to project.
 
-Note that `--num-snapshots 1000` is required for both bash scripts below, as the final video will be of length of 20 seconds, and will run at 50 fps. Modifying this and in turn the length of the projection video is not so complicated, so feel free to so, but remember to modify **both** numbers.
+Note that `--num-snapshots 1000` is required for the bash script below, as the final video will be of length of 20 seconds, and will run at 50 fps. Modifying this and in turn the length of the projection video is not so complicated, so feel free to so, but remember to modify **both** numbers.
 
-After you've done this, simply run:
+So now you just have to run:
 
 ```
 ./projection_video.sh 1
 ```
 
-if, for example, your Run #1 was a projection of real or generated images, i.e., the directory in `results` is `00001-project-generated-images` or `00001-project-real-images`.
+if, for example, your Run 1 was a projection of real or generated images, i.e., the directory in `results` is `00001-project-generated-images` or `00001-project-real-images`.
 
-The result of this bash script will be that your images will be sorted in subdirectories in each run (by either seed or real image number), and a video will be generated in each subdirectory. This video will have, to the right, the *Target image* (be it generated or real image), and to the left, the progression of the projection at each step, up to iteration 1000 (hence why 1000 snapshots).
+The result of this bash script will be that your images will be sorted in subdirectories in each run by either seed or real image number, like so:
+
+`./results/00001-project-real-images`
+&boxvr;&nbsp; `_finished.txt`
+&boxvr;&nbsp; `image0000`
+&boxv;&nbsp; &boxvr;&nbsp; `image0000-projection.mp4`
+&boxv;&nbsp; &boxvr;&nbsp; `image0000-step0001.png`
+&boxv;&nbsp; &boxvr;&nbsp; `...`
+&boxv;&nbsp; &boxur;&nbsp; `image0000-step0999.png`
+&boxvr;&nbsp; `image0001`
+&boxvr;&nbsp; `image0002`
+&boxvr;&nbsp; `...`
+&boxvr;&nbsp; `run.txt`
+&boxvr;&nbsp; `submit_config.pkl`
+&boxur;&nbsp; `submit_config.txt`
+
+For each of these, a projection video will be generated which will have, to the right, the *Target image* (be it generated or real), and to the left, the progression of the projection at each step, up to iteration 1000 (hence why 1000 snapshots).
+
+An example of this is the following, where we are projecting a center-cropped image of the [A2D2](https://www.audi-electronics-venture.de/aev/web/de/driving-dataset.html) dataset into the latent space of the StyleGAN2 trained on the [FFHQ](https://github.com/NVlabs/ffhq-dataset) dataset:
+
+<video src="/examples/videos/image0001-projection.mp4" style="width:100%" controls preload></video>
 
 Henceforth, it will be the official implementation of StyleGAN2, so pay attention to the official author's notes:
 
