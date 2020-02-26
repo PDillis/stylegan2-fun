@@ -1,10 +1,11 @@
 #!/bin/bash
 
 # Run in a terminal:
-# ./projection_video.sh 5 real
+# ./projection_video.sh 5
 
-# 5 will be the run number and on it, real images were projected using the official
-# repository (e.g., you have, in the results subdirectory, 00005-project-real-images)
+# 5 will be the run number where either real or generated images were projected
+# using the official repository (e.g., you have, in the results subdirectory,
+# 00005-project-real-images or 00005-project-generated-images)
 
 # Some nice bash editing commands:
 RED='\033[0;31m'

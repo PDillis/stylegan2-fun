@@ -1,5 +1,98 @@
 # Let's have fun with StyleGAN2!
 
+SOTA GANs can become cumbersome or even downright intimidating, if not daunting. StyleGAN2 is no different, especially when you consider the compute capabilities usually needed to fully train one model from scratch. This is what this repo is here for!
+
+We add some features to StyleGAN2's official repo, so please get acquainted with the latter before delving deep into this one. Take special attention to the  [Requirements](#requirements), in order for the code to run correctly. Should you encounter any errors, check out a possible solution in [Troubleshooting](#tshoot)
+
+In essence,this repo adds two new features:
+* [Interpolation videos](#latent)
+    * Random vector interpolation
+    * Style mixing
+* [Projection videos](#proj)
+    * Generate the projection video of a real or generated image
+
+Two other changes have been made to the original repo, specifically also in `run_generator.py`:
+
+* When generating random images by seed number, you can now save them in a grid by adding `--grid=True`; the grid dimensions will be inferred by the number of `--seeds` you use
+* The `_parse_num_range(s)` function has been modified in order to accept any combination of comma separated values, ranges, or combination of both, i.e.: `--seeds=1,2,5-100,999` is now also accepted
+    * *Caution:* for `style-mixing-video`, for example, using too many `--col-seeds` will result in an OOM
+<a name="tshoot"></a>
+## Troubleshooting
+
+But first, some troubleshooting: if, by some reason, you run into the following error while attempting to run the official repo in Ubuntu 18.04:
+
+```
+error: #error "C++ versions less than C++11 are not supported."
+```
+
+know that you are not alone and that many have suffered as you surely have. The good news is that there's a [quick fix](https://stackoverflow.com/a/59368180) for this: modify the `nvcc` call in [line 64](https://github.com/NVlabs/stylegan2/blob/7d3145d23013607b987db30736f89fb1d3e10fad/dnnlib/tflib/custom_ops.py#L64) in `dnnlib/tflib/custom_ops.py` by replacing it with:
+
+```python
+cmd = 'nvcc --std=c++11 -DNDEBUG ' + opts.strip()
+```
+
+The bad news is that it doesn't always work, and it's not a *pretty* fix, but at least it let me run the code on my PC. You might not encounter this error, but make sure to always check if you meet the [Requirements](#requirements), especially by running the test `test_nvcc.cu`.
+
+<a name="latent"></a>
+## Latent space exploration
+
+What is a trained GAN without a bit of latent space exploration? We can do the typical interpolation between random latent vectors, as well as some [style mixing](https://youtu.be/c-NJtV9Jvp0?t=145) as in the oficial repo, which we can of course recreate.
+
+### Random interpolation
+
+A linear interpolation or [lerp](https://en.wikipedia.org/wiki/Linear_interpolation) is done between random vectors in $\mathcal{Z}$, which in turn will be mapped into $\mathcal{W}$ by the Generator. There are two options:
+
+* Give a list of `--seeds` (in the form `a,b,c`, `a-b,c`, or even a combination `a,b-c,d`), and the code will infer the best width and height for the generated video. For example, we wish the seeds to be from `42` to `47` (inclusive), then we run:
+
+```
+python run_generator.py lerp-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
+    --seeds=42-47
+```
+
+![3x2-lerp]('https://github.com/PDillis/stylegan2-fun/examples/gifs/3x2-lerp.gif')
+
+ By default, we will have that `--truncation-psi=1.0`, `--duration-sec=30.0` and `--fps=30`, so modify these as you please.
+
+* Give a single seed in `seeds`, as well as the grid width and height (`--grid-w` and `--grid-h`, respectively) for the generated video. We can then generate a 60fps, 15 second video of size 2x2, with $\psi=0.7$ like so:
+
+```
+python run_generator.py lerp-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
+    --seeds=1000 --grid-w=2 --grid-h=2 --truncation-psi=0.7 --fps=60 --duration-sec=15
+```
+
+![2x2-lerp]('https://github.com/PDillis/stylegan2-fun/examples/gifs/2x2-lerp.gif')
+
+### Style mixing
+
+Harkening to StyleGAN's [style mixing figure](https://github.com/NVlabs/stylegan/blob/66813a32aac5045fcde72751522a0c0ba963f6f2/generate_figures.py#L59), we can also mix different styles from the source images `--col-seeds` onto the destination image `--row-seed`:
+
+```
+python run_generator.py style-mixing-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
+    --col-seeds=55,821,1789,293 --row-seed=85
+```
+
+![style-mixing]('https://github.com/PDillis/stylegan2-fun/examples/gifs/4x1-style-mixing.gif')
+
+ By default, we will have that `--truncation-psi=0.7`, `--duration-sec=30.0`, `--fps=30`, and `--col-styles=0-6`, which indicates that we will use the styles from layers $4^2$ up to the first layer of the $32^2$ (remember there are two per layer). So, if you wish to only use the *fine* styles, i.e., from $64^2$ up to $1024^2$, run:
+
+```
+python run_generator.py style-mixing-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
+    --col-seeds=55,821,1789,293 --row-seed=85 --col-styles=8-17
+```
+![style-mixing-fine]('https://github.com/PDillis/stylegan2-fun/examples/gifs/4x1-style-mixing-fine.gif')
+
+In essence, you will take the `styles` from the `--row-seed` and apply them to the `styles` from the `--col-seeds`. So, if you wish to apply the **coarse styles** defined in the StyleGAN paper, you must use `--col-styles=0-3`; for the **middle styles**, use `--col-styles=4-7`; and finally, for the **fine styles**, use `--col-styles=8-max`, where `max` will depend on the generated image size of your model. The following table gives a small summary of this `max` value:
+
+| `Gs.ouptut_shape[-1]` | max(`--col-styles`) |
+| --- | --- |
+| `128` | `11` |
+| `256` | `13` |
+| `512` | `15` |
+| `1024` | `17` |
+
+I hope you get the gist.
+
+<a name="proj"></a>
 ## Recreating the Projection Videos
 
 To generate your own projection videos [as in the official implementation](https://drive.google.com/open?id=1ZpEiQuUFm4XQRUxoJj3f4O8-f102iXJc), you must of course have to have a projection in your `results` subdir!
@@ -7,7 +100,9 @@ To generate your own projection videos [as in the official implementation](https
 For example, to project generated images by your trained model, run:
 
 ```
-python run_projector.py project-generated-images --network /path/to/network/pkl --num-snapshots 1000 --seeds ....
+python run_projector.py project-generated-images \
+    --network=/path/to/network/pkl --num-snapshots=1000 \
+    --seeds=....
 ```
 
 where, if you know specific seeds that you wish to project, include it in the argument.
@@ -17,7 +112,11 @@ To project real images, these must be in a `tfrecord` file, so the easiest thing
 Then, to project real images, run:
 
 ```
-python run_projector.py project-real-images --network /path/to/network/pkl --data-dir /path/to/tfrecord/root/dir --dataset tfrecord_name --num-snapshots 1000 --num-images as-many-as-you-want(int)
+python run_projector.py project-real-images \
+    --network=/path/to/network/pkl \
+    --data-dir=/path/to/tfrecord/root/dir \
+    --dataset=tfrecord_name --num-snapshots=1000 \
+    --num-images=N(as many as you wish/have the time)
 ```
 
 Take heed that, if you run the above code, say, two times, with the first time setting `--num-images 5` and the second time setting `--num-images 10`, then the first run will be contained in the second, as they will have the same seed. As such, if you wish to project a specific set of real images from your training data, then simply convert these to a `tfrecord` file with `dataset_tool.py` and you don't have to worry about when you will get the specific image(s) you want to project.
@@ -34,25 +133,49 @@ if, for example, your Run 1 was a projection of real or generated images, i.e., 
 
 The result of this bash script will be that your images will be sorted in subdirectories in each run by either seed or real image number, like so:
 
-`./results/00001-project-real-images`
-&boxvr;&nbsp; `_finished.txt`
-&boxvr;&nbsp; `image0000`
-&boxv;&nbsp; &boxvr;&nbsp; `image0000-projection.mp4`
-&boxv;&nbsp; &boxvr;&nbsp; `image0000-step0001.png`
-&boxv;&nbsp; &boxvr;&nbsp; `...`
-&boxv;&nbsp; &boxur;&nbsp; `image0000-step0999.png`
-&boxvr;&nbsp; `image0001`
-&boxvr;&nbsp; `image0002`
-&boxvr;&nbsp; `...`
-&boxvr;&nbsp; `run.txt`
-&boxvr;&nbsp; `submit_config.pkl`
-&boxur;&nbsp; `submit_config.txt`
+```
+./results/00001-project-real-images
+├   _finished.txt
+├───image0000
+│   ├   image0000-projection.mp4
+│   ├   image0000-step0001.png
+│   ├   ...
+│   └   image0000-step0999.png
+├───image0001
+│   ├   image0001-projection.mp4
+│   ├   image0001-step0001.png
+│   ├   ...
+│   └   image0001-step0999.png
+├───image0002
+├───...
+├───run.txt
+├───submit_config.pkl
+└───submit_config.txt
+```
 
 For each of these, a projection video will be generated which will have, to the right, the *Target image* (be it generated or real), and to the left, the progression of the projection at each step, up to iteration 1000 (hence why 1000 snapshots).
 
-An example of this is the following, where we are projecting a center-cropped image of the [A2D2](https://www.audi-electronics-venture.de/aev/web/de/driving-dataset.html) dataset into the latent space of the StyleGAN2 trained on the [FFHQ](https://github.com/NVlabs/ffhq-dataset) dataset:
+An example of this is the following, where we are projecting a center-cropped image of the [A2D2](https://www.audi-electronics-venture.de/aev/web/de/driving-dataset.html) dataset into the latent space of the StyleGAN2 trained only on the [FFHQ](https://github.com/NVlabs/ffhq-dataset) dataset:
 
-<video src="/examples/videos/image0001-projection.mp4" style="width:100%" controls preload></video>
+[![](https://img.youtube.com/vi/9-CUDF07cEE/0.jpg)](https://youtu.be/9-CUDF07cEE)
+
+## Mass Projector
+
+Another tool that was useful for my purposes is `mass_projector.sh`, where, given a directory with all the model checkpoints you wish to analyze, you can then project as many images as you wish on each checkpoint in order to do a better analysis, such as calculating the PSNR, SSIM or MSE between the projected and target image.
+
+**I truly have no idea if this will be useful for someone else, but it was for me, so I add it here.**
+
+Usage:
+
+```
+./mass_projector.sh name-of-dataset /dataset/root/path /models/root/path N
+```
+
+where `name-of-dataset` will be the name of your dataset in your `/dataset/root/path` (the same terminology we use whilst projecting images or training the model), `/models/root/path` will be the path to the directory with all the models you wish to project, and `N` is the number of images you wish to project per `pkl` file (per model checkpoint).
+
+Note that, by default, we will have `--num-snapshots=1`, as we are only interested in the final projection and also this will speed up the projection by $~3\times$ (i.e., from around 12 minutes to 4 minutes per image projected on an [NVIDIA 1080 GTX](https://www.geforce.com/hardware/desktop-gpus/geforce-gtx-1080/specifications)).
+
+---
 
 Henceforth, it will be the official implementation of StyleGAN2, so pay attention to the official author's notes:
 
@@ -90,6 +213,7 @@ For press and other inquiries, please contact Hector Marinez at [hmarinez@nvidia
 | &ensp;&ensp; &boxvr;&nbsp;  [stylegan2-horse-config-f.pkl](https://drive.google.com/open?id=1N55ZtBhEyEbDn6uKBjCNAew1phD5ZAh-) | StyleGAN2 for <span style="font-variant:small-caps">LSUN Horse</span> dataset at 256&times;256
 | &ensp;&ensp; &boxur;&nbsp;&#x22ef;  | Other training configurations used in the paper
 
+<a name="requirements"></a>
 ## Requirements
 
 * Both Linux and Windows are supported. Linux is recommended for performance and compatibility reasons.
