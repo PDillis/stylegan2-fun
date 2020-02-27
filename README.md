@@ -50,7 +50,7 @@ python run_generator.py lerp-video --network=gdrive:networks/stylegan2-ffhq-conf
     --seeds=42-47
 ```
 
-![3x2-lerp](examples/gifs/3x2-lerp.gif)
+![3x2-lerp](docs/gifs/3x2-lerp.gif)
 
  By default, we will have that `--truncation-psi=1.0`, `--duration-sec=30.0` and `--fps=30`, so modify these as you please.
 
@@ -61,7 +61,7 @@ python run_generator.py lerp-video --network=gdrive:networks/stylegan2-ffhq-conf
     --seeds=1000 --grid-w=2 --grid-h=2 --truncation-psi=0.7 --fps=60 --duration-sec=15
 ```
 
-![2x2-lerp](examples/gifs/2x2-lerp.gif)
+![2x2-lerp](docs/gifs/2x2-lerp.gif)
 
 <a name="style"></a>
 ### Style mixing
@@ -73,7 +73,7 @@ python run_generator.py style-mixing-video --network=gdrive:networks/stylegan2-f
     --col-seeds=55,821,1789,293 --row-seed=85
 ```
 
-![style-mixing](examples/gifs/4x1-style-mixing.gif)
+![style-mixing](docs/gifs/4x1-style-mixing.gif)
 
  By default, we will have that `--truncation-psi=0.7`, `--duration-sec=30.0`, `--fps=30`, and `--col-styles=0-6`, which indicates that we will use the styles from layers 4x4 up to the first layer of the 32x32 (remember there are two per layer).
 
@@ -83,7 +83,7 @@ python run_generator.py style-mixing-video --network=gdrive:networks/stylegan2-f
 python run_generator.py style-mixing-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
     --col-seeds=55,821,1789,293 --row-seed=85 --col-styles=8-17
 ```
-![style-mixing-fine](examples/gifs/4x1-style-mixing-fine.gif)
+![style-mixing-fine](docs/gifs/4x1-style-mixing-fine.gif)
 
 In essence, you will replace the selected styles from the `--col-seeds` with the styles from the `--row-seed`. So, if you wish to apply the **coarse styles** defined in the StyleGAN paper, you must use `--col-styles=0-3`; for the **middle styles**, use `--col-styles=4-7`; and finally, for the **fine styles**, use `--col-styles=8-max`, where `max` will depend on the generated image size of your model. The following table gives a small summary of this `max_style` value:
 
@@ -168,7 +168,7 @@ For each of these, a projection video will be generated which will have, to the 
 
 An example of this is the following, where we are projecting a center-cropped image of the [A2D2](https://www.audi-electronics-venture.de/aev/web/de/driving-dataset.html) dataset (right) into the latent space of the StyleGAN2 trained only on the [FFHQ](https://github.com/NVlabs/ffhq-dataset) dataset (left):
 
-![projection-video](examples/gifs/image0001-projection.gif)
+![projection-video](docs/gifs/image0001-projection.gif)
 
 Watch the full size video [here](https://youtu.be/9-CUDF07cEE).
 

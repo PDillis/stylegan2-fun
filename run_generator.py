@@ -30,7 +30,7 @@ def create_image_grid(images, grid_size=None):
     # Some sanity check:
     assert images.ndim == 3 or images.ndim == 4
     num, img_h, img_w = images.shape[0], images.shape[1], images.shape[2]
-    #
+
     if grid_size is not None:
         grid_w, grid_h = tuple(grid_size)
     else:
@@ -44,7 +44,7 @@ def create_image_grid(images, grid_size=None):
         x = (idx % grid_w) * img_w
         y = (idx // grid_w) * img_h
         grid[y : y + img_h, x : x + img_w, ...] = images[idx]
-        #
+
     return grid
 
 #----------------------------------------------------------------------------
@@ -79,6 +79,10 @@ def style_mixing_example(network_pkl, row_seeds, col_seeds, truncation_psi, col_
     print('Loading networks from "%s"...' % network_pkl)
     _G, _D, Gs = pretrained_networks.load_networks(network_pkl)
     w_avg = Gs.get_var('dlatent_avg') # [component]
+
+    # Sanity check: styles are actually possible for generated image size
+    max_style = int(2 * np.log2(Gs.output_shape[-1])) - 3
+    assert max(col_styles) < max_style, "Maximum col-style allowed: {}".format(max_style)
 
     Gs_syn_kwargs = dnnlib.EasyDict()
     Gs_syn_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
@@ -208,8 +212,8 @@ def lerp_video(
 
 def style_mixing_video(
     network_pkl,
-    src_seed,               # Seed of the source image/row
-    dst_seeds,              # Seeds of the destination images/columns
+    src_seed,               # Seed of the source image style (row)
+    dst_seeds,              # Seeds of the destination image styles (columns)
     col_styles,             # Styles to transfer from top row to source image
     truncation_psi=1.0,
     duration_sec=30.0,
@@ -225,10 +229,9 @@ def style_mixing_video(
     _G, _D, Gs = pretrained_networks.load_networks(network_pkl)
     w_avg = Gs.get_var('dlatent_avg') # [component]
 
-    # Sanity check: styles are actually possible for the size of the generated
-    # images:
+    # Sanity check: styles are actually possible for generated image size
     max_style = int(2 * np.log2(Gs.output_shape[-1])) - 3
-    assert max(col_styles) < max_style, "Maximum style allowed: {}".format(max_style)
+    assert max(col_styles) < max_style, "Maximum col-style allowed: {}".format(max_style)
 
     Gs_syn_kwargs = dnnlib.EasyDict()
     Gs_syn_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
