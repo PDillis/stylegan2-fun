@@ -6,15 +6,15 @@ We add some features to StyleGAN2's official repo, so please get acquainted with
 
 In essence,this repo adds two new features:
 * [Interpolation videos](#latent)
-    * Random vector interpolation
-    * Style mixing
+    * [Random vector interpolation](#lerp)
+    * [Style mixing](#style)
 * [Projection videos](#proj)
     * Generate the projection video of a real or generated image
 
 Two other changes have been made to the original repo, specifically also in `run_generator.py`:
 
 * When generating random images by seed number, you can now save them in a grid by adding `--grid=True`; the grid dimensions will be inferred by the number of `--seeds` you use
-* The `_parse_num_range(s)` function has been modified in order to accept any combination of comma separated values, ranges, or combination of both, i.e.: `--seeds=1,2,5-100,999` is now also accepted
+* The `_parse_num_range(s)` function has been modified in order to accept any combination of comma separated numbers or ranges, or combination of both, i.e.: `--seeds=1,2,5-100,999-1004, 123456` is now also accepted
     * *Caution:* for `style-mixing-video`, for example, using too many `--col-seeds` will result in an OOM
 <a name="tshoot"></a>
 ## Troubleshooting
@@ -38,11 +38,12 @@ The bad news is that it doesn't always work, and it's not a *pretty* fix, but at
 
 What is a trained GAN without a bit of latent space exploration? We can do the typical interpolation between random latent vectors, as well as some [style mixing](https://youtu.be/c-NJtV9Jvp0?t=145) as in the oficial repo, which we can of course recreate.
 
+<a name="lerp"></a>
 ### Random interpolation
 
-A linear interpolation or [lerp](https://en.wikipedia.org/wiki/Linear_interpolation) is done between random vectors in $\mathcal{Z}$, which in turn will be mapped into $\mathcal{W}$ by the Generator. There are two options:
+A linear interpolation or [lerp](https://en.wikipedia.org/wiki/Linear_interpolation) is done between random vectors in **Z**, which in turn will be mapped into **W** by the Generator. There are two options:
 
-* Give a list of `--seeds` (in the form `a,b,c`, `a-b,c`, or even a combination `a,b-c,d`), and the code will infer the best width and height for the generated video. For example, we wish the seeds to be from `42` to `47` (inclusive), then we run:
+* Give a list of `--seeds` (in the form `a,b,c`, `a-b,c`, or even a combination `'a,b-c,d,e-f,...'`), and the code will infer the best width and height for the generated video. For example, we wish the seeds to be from `42` to `47` (inclusive), then we run:
 
 ```
 python run_generator.py lerp-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
@@ -53,7 +54,7 @@ python run_generator.py lerp-video --network=gdrive:networks/stylegan2-ffhq-conf
 
  By default, we will have that `--truncation-psi=1.0`, `--duration-sec=30.0` and `--fps=30`, so modify these as you please.
 
-* Give a single seed in `seeds`, as well as the grid width and height (`--grid-w` and `--grid-h`, respectively) for the generated video. We can then generate a 60fps, 15 second video of size 2x2, with $\psi=0.7$ like so:
+* Give a single seed in `seeds`, as well as the grid width and height (`--grid-w` and `--grid-h`, respectively) for the generated video. We can then generate a 60fps, 15 second video of size 2x2, with `--truncation-psi=0.7` like so:
 
 ```
 python run_generator.py lerp-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
@@ -62,9 +63,10 @@ python run_generator.py lerp-video --network=gdrive:networks/stylegan2-ffhq-conf
 
 ![2x2-lerp](examples/gifs/2x2-lerp.gif)
 
+<a name="style"></a>
 ### Style mixing
 
-Harkening to StyleGAN's [style mixing figure](https://github.com/NVlabs/stylegan/blob/66813a32aac5045fcde72751522a0c0ba963f6f2/generate_figures.py#L59), we can also mix different styles from the source images `--col-seeds` onto the destination image `--row-seed`:
+Harkening to StyleGAN's [style mixing figure](https://github.com/NVlabs/stylegan/blob/66813a32aac5045fcde72751522a0c0ba963f6f2/generate_figures.py#L59), we can also mix different styles from the source image `--row'seed` onto the destination image `--col'seeds`:
 
 ```
 python run_generator.py style-mixing-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
@@ -73,7 +75,9 @@ python run_generator.py style-mixing-video --network=gdrive:networks/stylegan2-f
 
 ![style-mixing](examples/gifs/4x1-style-mixing.gif)
 
- By default, we will have that `--truncation-psi=0.7`, `--duration-sec=30.0`, `--fps=30`, and `--col-styles=0-6`, which indicates that we will use the styles from layers $4^2$ up to the first layer of the $32^2$ (remember there are two per layer). So, if you wish to only use the *fine* styles, i.e., from $64^2$ up to $1024^2$, run:
+ By default, we will have that `--truncation-psi=0.7`, `--duration-sec=30.0`, `--fps=30`, and `--col-styles=0-6`, which indicates that we will use the styles from layers 4x4 up to the first layer of the 32x32 (remember there are two per layer).
+
+ For example, if you wish to only apply the **fine styles** (from 64x64 up to 1024x1024 as defined in the [StyleGAN paper](https://arxiv.org/abs/1812.04948)) from the `--row-seed` onto the `--col-seeds`, run:
 
 ```
 python run_generator.py style-mixing-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
@@ -81,16 +85,22 @@ python run_generator.py style-mixing-video --network=gdrive:networks/stylegan2-f
 ```
 ![style-mixing-fine](examples/gifs/4x1-style-mixing-fine.gif)
 
-In essence, you will take the `styles` from the `--row-seed` and apply them to the `styles` from the `--col-seeds`. So, if you wish to apply the **coarse styles** defined in the StyleGAN paper, you must use `--col-styles=0-3`; for the **middle styles**, use `--col-styles=4-7`; and finally, for the **fine styles**, use `--col-styles=8-max`, where `max` will depend on the generated image size of your model. The following table gives a small summary of this `max` value:
+In essence, you will replace the selected styles from the `--col-seeds` with the styles from the `--row-seed`. So, if you wish to apply the **coarse styles** defined in the StyleGAN paper, you must use `--col-styles=0-3`; for the **middle styles**, use `--col-styles=4-7`; and finally, for the **fine styles**, use `--col-styles=8-max`, where `max` will depend on the generated image size of your model. The following table gives a small summary of this `max_style` value:
 
-| `Gs.ouptut_shape[-1]` | max(`--col-styles`) |
+| `Gs.ouptut_shape[-1]` | `max_style` |
 | --- | --- |
 | `128` | `11` |
 | `256` | `13` |
 | `512` | `15` |
 | `1024` | `17` |
 
-I hope you get the gist.
+I hope you get the gist or, if you wish to make it truly independent of any user input error in the code you develop, you can always calculate it via:
+
+```python
+max_style = int(2 * np.log2(Gs.output_shape[-1])) - 3
+```
+
+Which is used in the assertion in the beginning of the `style_mixing_video` function.
 
 <a name="proj"></a>
 ## Recreating the Projection Videos
@@ -107,7 +117,7 @@ python run_projector.py project-generated-images \
 
 where, if you know specific seeds that you wish to project, include it in the argument.
 
-To project real images, these must be in a `tfrecord` file, so the easiest thing to do is to use the file you used to train your [StyleGAN](https://github.com/NVlabs/stylegan) or StyleGAN2 model (as a side note, I must put emphasis on the fact that **you can use either a trained model.pkl from StyleGAN or StyleGAN2**, so this projection code can be used for your *old* StyleGAN models).
+To project real images, these must be in a `tfrecord` file, so the easiest thing to do is to use the file you used to train your [StyleGAN](https://github.com/NVlabs/stylegan) or StyleGAN2 model. As a side note, I must put emphasis on the fact that **you can use either a trained model.pkl from StyleGAN or StyleGAN2**, so this projection code can be used for your *old* StyleGAN models as well, which I found useful as the majority of my work was done with StyleGAN.
 
 Then, to project real images, run:
 
@@ -115,7 +125,8 @@ Then, to project real images, run:
 python run_projector.py project-real-images \
     --network=/path/to/network/pkl \
     --data-dir=/path/to/tfrecord/root/dir \
-    --dataset=tfrecord_name --num-snapshots=1000 \
+    --dataset=tfrecord_name \
+    --num-snapshots=1000 \
     --num-images=N(as many as you wish/have the time)
 ```
 
@@ -155,9 +166,11 @@ The result of this bash script will be that your images will be sorted in subdir
 
 For each of these, a projection video will be generated which will have, to the right, the *Target image* (be it generated or real), and to the left, the progression of the projection at each step, up to iteration 1000 (hence why 1000 snapshots).
 
-An example of this is the following, where we are projecting a center-cropped image of the [A2D2](https://www.audi-electronics-venture.de/aev/web/de/driving-dataset.html) dataset into the latent space of the StyleGAN2 trained only on the [FFHQ](https://github.com/NVlabs/ffhq-dataset) dataset:
+An example of this is the following, where we are projecting a center-cropped image of the [A2D2](https://www.audi-electronics-venture.de/aev/web/de/driving-dataset.html) dataset (right) into the latent space of the StyleGAN2 trained only on the [FFHQ](https://github.com/NVlabs/ffhq-dataset) dataset (left):
 
-[![](https://img.youtube.com/vi/9-CUDF07cEE/0.jpg)](https://youtu.be/9-CUDF07cEE)
+![projection-video](examples/gifs/image0001-projection.gif)
+
+Watch the full size video [here](https://youtu.be/9-CUDF07cEE).
 
 ## Mass Projector
 
@@ -173,7 +186,7 @@ Usage:
 
 where `name-of-dataset` will be the name of your dataset in your `/dataset/root/path` (the same terminology we use whilst projecting images or training the model), `/models/root/path` will be the path to the directory with all the models you wish to project, and `N` is the number of images you wish to project per `pkl` file (per model checkpoint).
 
-Note that, by default, we will have `--num-snapshots=1`, as we are only interested in the final projection and also this will speed up the projection by $~3\times$ (i.e., from around 12 minutes to 4 minutes per image projected on an [NVIDIA 1080 GTX](https://www.geforce.com/hardware/desktop-gpus/geforce-gtx-1080/specifications)).
+Note that, by default, we will have `--num-snapshots=1`, as we are only interested in the final projection and also this will speed up the projection by ~3x (i.e., from around 12 minutes to 4 minutes per image projected on an [NVIDIA 1080 GTX](https://www.geforce.com/hardware/desktop-gpus/geforce-gtx-1080/specifications)).
 
 ---
 

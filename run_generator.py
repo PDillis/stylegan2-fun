@@ -225,6 +225,11 @@ def style_mixing_video(
     _G, _D, Gs = pretrained_networks.load_networks(network_pkl)
     w_avg = Gs.get_var('dlatent_avg') # [component]
 
+    # Sanity check: styles are actually possible for the size of the generated
+    # images:
+    max_style = int(2 * np.log2(Gs.output_shape[-1])) - 3
+    assert max(col_styles) < max_style, "Maximum style allowed: {}".format(max_style)
+
     Gs_syn_kwargs = dnnlib.EasyDict()
     Gs_syn_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
     Gs_syn_kwargs.randomize_noise = False
@@ -303,11 +308,13 @@ def _parse_num_range(s):
         String s, a comma separated list of numbers 'a,b,c', a range 'a-c',
         or even a combination of both 'a,b-c', 'a-b,c', 'a,b-c,d,e-f,...'
     Output:
-        nums, a list of ints in increasing order
+        nums, a list of ascending ordered ints with repeating values deleted
     '''
-    # In case there's a space between the numbers (impossible due to argparse):
+    # Sanity check 0:
+    # In case there's a space between the numbers (impossible due to argparse,
+    # but hey, I am that paranoid):
     s = s.replace(" ", "")
-    # Split with comma:
+    # Split w.r.t comma:
     str_list = s.split(',')
     nums = []
     for el in str_list:
@@ -328,7 +335,7 @@ def _parse_num_range(s):
             nums.append(int(el))
     # Sanity check 2: delete repeating numbers:
     nums = list(set(nums))
-    # Return the numbers in increasing order:
+    # Return the numbers in ascending order:
     return sorted(nums)
 
 #----------------------------------------------------------------------------
