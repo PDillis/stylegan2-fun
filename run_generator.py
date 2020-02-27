@@ -238,7 +238,7 @@ def style_mixing_video(
     Gs_syn_kwargs.randomize_noise = False
     Gs_syn_kwargs.minibatch_size = minibatch_size
 
-    # First col latents
+    # Left col latents
     print('Generating Source W vectors...')
     src_shape = [num_frames] + Gs.input_shape[1:]
     src_z = np.random.RandomState(*src_seed).randn(*src_shape).astype(np.float32) # [frames, src, component]
@@ -250,7 +250,8 @@ def style_mixing_video(
     src_w = Gs.components.mapping.run(src_z, None)
     src_w = w_avg + (src_w - w_avg) * truncation_psi
 
-    # First row latents
+    # Top row latents
+    print('Generating Destination W vectors...')
     dst_z = np.stack([np.random.RandomState(seed).randn(Gs.input_shape[1]) for seed in dst_seeds])
     dst_w = Gs.components.mapping.run(dst_z, None)
     dst_w = w_avg + (dst_w - w_avg) * truncation_psi
