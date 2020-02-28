@@ -52,7 +52,7 @@ python run_generator.py lerp-video \
 
 ![3x2-lerp](./docs/gifs/3x2-lerp.gif)
 
- (All GIFs here are resized to show the )
+ (All GIFs in this README are resized/downgraded)
 
  By default, we will have that `--truncation-psi=1.0`, `--duration-sec=30.0` and `--fps=30`, so modify these as you please.
 
