@@ -6,6 +6,7 @@
 
 import argparse
 
+import scipy
 import numpy as np
 import PIL.Image
 
