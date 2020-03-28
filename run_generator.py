@@ -83,7 +83,7 @@ def style_mixing_example(network_pkl, row_seeds, col_seeds, truncation_psi, col_
 
     # Sanity check: styles are actually possible for generated image size
     max_style = int(2 * np.log2(Gs.output_shape[-1])) - 3
-    assert max(col_styles) < max_style, "Maximum col-style allowed: {}".format(max_style)
+    assert max(col_styles) <= max_style, "Maximum col-style allowed: {}".format(max_style)
 
     Gs_syn_kwargs = dnnlib.EasyDict()
     Gs_syn_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
@@ -232,7 +232,7 @@ def style_mixing_video(
 
     # Sanity check: styles are actually possible for generated image size
     max_style = int(2 * np.log2(Gs.output_shape[-1])) - 3
-    assert max(col_styles) < max_style, "Maximum col-style allowed: {}".format(max_style)
+    assert max(col_styles) <= max_style, "Maximum col-style allowed: {}".format(max_style)
 
     Gs_syn_kwargs = dnnlib.EasyDict()
     Gs_syn_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
