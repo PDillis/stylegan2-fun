@@ -441,8 +441,8 @@ Run 'python %(prog)s <subcommand> --help' for subcommand help.''',
     func_name_map = {
         'generate-images': 'run_generator.generate_images',
         'style-mixing-example': 'run_generator.style_mixing_example',
-        'lerp-video': 'interpolation_videos.lerp_video',
-        'style-mixing-video': 'interpolation_videos.style_mixing_video'
+        'lerp-video': 'run_generator.lerp_video',
+        'style-mixing-video': 'run_generator.style_mixing_video'
     }
     dnnlib.submit_run(sc, func_name_map[subcmd], **kwargs)
 
