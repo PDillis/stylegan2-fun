@@ -379,8 +379,9 @@ def sightseeding(
     def make_frame(t):
         frame_idx = int(np.clip(np.round(t * mp4_fps), 0, num_frames - 1))
         latent = src_w[frame_idx]
-        # Get the images (with labels = None)
-        image = Gs.run(latent, None, **Gs_kwargs)
+	# Select the pertinent latent w column:
+        w = np.stack([latent]) # [18, 512] -> [1, 18, 512]
+        image = Gs.components.synthesis.run(w, **Gs_syn_kwargs)
         # Generate the grid for this timestamp:
         grid = create_image_grid(image, grid_size)
         # grayscale => RGB
@@ -394,7 +395,7 @@ def sightseeding(
     print('Generating sightseeding video...')
     videoclip = moviepy.editor.VideoClip(make_frame, duration=duration_sec)
     name = '-'
-    name = name.join(seeds)
+    name = name.join(map(str, seeds))
     mp4 = "{}-sighseeding.mp4".format(name)
     videoclip.write_videofile(dnnlib.make_run_dir_path(mp4),
                               fps=mp4_fps,
@@ -486,6 +487,9 @@ _examples = '''examples:
 
   # Generate style mixing example of fine styles layers (64^2-1024^2, as in StyleGAN)
   python %(prog)s style-mixing-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl --row-seed=85 --col-seeds=55,821,1789,293 --col-styles=8-17 --truncation-psi=1.0
+  
+  # Generate sightseeding video (1x1), with 5-second interpolation between seeds, looping back to the first seed in the end
+  python %(prog)s sightseeding --network=gdrive:networks/stylegan2-ffhq-config-f.pkl --seeds=4,9,7,5,4,6,8  --loop=True 
 '''
 
 #----------------------------------------------------------------------------
@@ -564,7 +568,8 @@ Run 'python %(prog)s <subcommand> --help' for subcommand help.''',
         'generate-images': 'run_generator.generate_images',
         'style-mixing-example': 'run_generator.style_mixing_example',
         'lerp-video': 'run_generator.lerp_video',
-        'style-mixing-video': 'run_generator.style_mixing_video'
+        'style-mixing-video': 'run_generator.style_mixing_video',
+        'sightseeding': 'run_generator.sightseeding'
     }
     dnnlib.submit_run(sc, func_name_map[subcmd], **kwargs)
 
