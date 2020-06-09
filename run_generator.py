@@ -16,6 +16,9 @@ import dnnlib.tflib as tflib
 import re
 import sys
 
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+
 import pretrained_networks
 
 #----------------------------------------------------------------------------
@@ -200,6 +203,8 @@ def lerp_video(
             grid = grid.repeat(3, 2)
         return grid
 
+    import moviepy.editor
+
     # Generate video using make_frame:
     print('Generating interpolation video...')
     videoclip = moviepy.editor.VideoClip(make_frame, duration=duration_sec)
@@ -294,11 +299,103 @@ def style_mixing_video(
                 )
         return np.array(canvas)
 
+    import moviepy.editor
+
     # Generate video using make_frame:
     print('Generating style-mixed video...')
     videoclip = moviepy.editor.VideoClip(make_frame, duration=duration_sec)
     grid_size = [len(dst_seeds), len(src_seed)]
     mp4 = "{}x{}-style-mixing.mp4".format(*grid_size)
+    videoclip.write_videofile(dnnlib.make_run_dir_path(mp4),
+                              fps=mp4_fps,
+                              codec=mp4_codec,
+                              bitrate=mp4_bitrate)
+
+#----------------------------------------------------------------------------
+
+def sightseeding(
+    network_pkl,                # Path to pretrained model pkl file
+    seeds,                      # List of random seeds to use
+    loop=False,                 # Loop back to the first seed when reaching the end
+    truncation_psi=1.0,         # Truncation trick
+    seed_sec=5.0,               # Time duration between seeds
+    mp4_fps=30,
+    mp4_codec="libx264",
+    mp4_bitrate="16M",
+    minibatch_size=8,
+):
+    print('Loading networks from "%s"...' % network_pkl)
+    _G, _D, Gs = pretrained_networks.load_networks(network_pkl)
+    w_avg = Gs.get_var('dlatent_avg') # [component]
+
+    Gs_syn_kwargs = dnnlib.EasyDict()
+    Gs_syn_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
+    Gs_syn_kwargs.randomize_noise = False
+    Gs_syn_kwargs.minibatch_size = minibatch_size
+
+    # Number of steps to take between each latent vector
+    n_steps = int(np.rint(seed_sec * mp4_fps))
+    # If we wish to return to the first latent, then we add it to the end 
+    if loop:
+        seeds.append(seeds[0])
+    # Number of frames in total
+    num_frames = int(n_steps * (len(seeds) - 1))
+    # Duration in seconds
+    duration_sec = num_frames / mp4_fps
+    # Generate the random vectors from each seed
+    print('Generating W vectors...')
+    all_z = np.stack([np.random.RandomState(seed).randn(*Gs.input_shape[1:]) for seed in seeds]) # [minibatch, component]
+    all_w = Gs.components.mapping.run(all_z, None) # [minibatch, layer, component]
+
+    # Helper function for linear interpolation
+    def lerp(w1, w2, n_steps):
+        '''
+        Input:
+            w1, w2: numpy arrays (latent vectors)
+            n_steps: number of steps to take between w1 and w2
+        Output:
+            vectors: numpy array of latent vectors, without including w2 
+        '''
+        ratios = np.linspace(0, 1, num=n_steps, endpoint=False)
+        vectors = list()
+        for ratio in ratios:
+            w = (1.0 - ratio) * w1 + ratio * w2
+            vectors.append(w)
+        return np.asarray(vectors)
+    
+    src_w = np.empty([0] + list(all_w.shape[1:]), dtype=np.float64)
+    for i in range(len(all_w) - 1):
+        # We interpolate between each pair of latents
+        interp = lerp(all_w[i], all_w[i+1], n_steps)
+        # append it to our source
+        src_w = np.append(src_w, interp, axis=0)
+    # Do the truncation trick
+    src_w = w_avg + (src_w - w_avg) * truncation_psi
+
+    # Our grid will be 1x1
+    grid_size = [1,1]
+
+    # Aux function: Frame generation func for moviepy.
+    def make_frame(t):
+        frame_idx = int(np.clip(np.round(t * mp4_fps), 0, num_frames - 1))
+        latent = src_w[frame_idx]
+        # Get the images (with labels = None)
+        image = Gs.run(latent, None, **Gs_kwargs)
+        # Generate the grid for this timestamp:
+        grid = create_image_grid(image, grid_size)
+        # grayscale => RGB
+        if grid.shape[2] == 1:
+            grid = grid.repeat(3, 2)
+        return grid
+
+    import moviepy.editor
+
+    # Generate video using make_frame:
+    print('Generating sightseeding video...')
+    videoclip = moviepy.editor.VideoClip(make_frame, duration=duration_sec)
+    name = '-'
+    name = name.join(seeds)
+    mp4 = "{}-sighseeding.mp4".format(name)
     videoclip.write_videofile(dnnlib.make_run_dir_path(mp4),
                               fps=mp4_fps,
                               codec=mp4_codec,
@@ -318,7 +415,7 @@ def _parse_num_range(s):
     # Sanity check 0:
     # In case there's a space between the numbers (impossible due to argparse,
     # but hey, I am that paranoid):
-    s = s.replace(" ", "")
+    s = s.replace(' ', '')
     # Split w.r.t comma:
     str_list = s.split(',')
     nums = []
@@ -342,6 +439,22 @@ def _parse_num_range(s):
     nums = list(set(nums))
     # Return the numbers in ascending order:
     return sorted(nums)
+
+#----------------------------------------------------------------------------
+
+def _parse_seeds(s):
+    '''
+    Input:
+        String s, a comma separated list of numbers 'a,b,c,...'
+    Output:
+        nums, an unordered list of ints in s with no deletion of repeated values or sorting
+    '''
+    # Do the same sanity check as above:
+    s = s.replace(' ', '')
+    # Split w.r.t. comma:
+    str_list = s.split(',')
+    nums = [int(el) for el in str_list]
+    return nums
 
 #----------------------------------------------------------------------------
 
@@ -422,6 +535,15 @@ Run 'python %(prog)s <subcommand> --help' for subcommand help.''',
     parser_style_mixing_video.add_argument('--duration-sec', type=float, help='Duration of video (default: %(default)s)', default=30, dest='duration_sec')
     parser_style_mixing_video.add_argument('--fps', type=int, help='FPS of generated video (default: %(default)s)', default=30, dest='mp4_fps')
     parser_style_mixing_video.add_argument('--result-dir', help='Root directory for run results (default: %(default)s)', default='results', metavar='DIR')
+
+    parser_sightseeding = subparsers.add_parser('sightseeding', help='Generate latent interpolation video between a set of user-fed random seeds.')
+    parser_sightseeding.add_argument('--network', help='Path to network pickle filename', dest='network_pkl', required=True)
+    parser_sightseeding.add_argument('--seeds', type=_parse_seeds, help='List of random seeds', dest='seeds', required=True)
+    parser_sightseeding.add_argument('--loop', type=bool, help='Close the sightseeding loop; after the last seed, return to the first one (default: %(default)s)', default=False, dest='loop')
+    parser_sightseeding.add_argument('--truncation-psi', type=float, help='Truncation psi (default: %(default)s)', default=1.0, dest='truncation_psi')
+    parser_sightseeding.add_argument('--seed-sec', type=float, help='Number of seconds between each seed (default: %(default)s)', default=5.0, dest='seed_sec')
+    parser_sightseeding.add_argument('--fps', type=int, help='FPS of generated video (default: %(default)s)', default=30, dest='mp4_fps')
+    parser_sightseeding.add_argument('--result-dir', help='Root directory for run results (default: %(default)s)', default='results', metavar='DIR')
 
     args = parser.parse_args()
     kwargs = vars(args)
