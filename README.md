@@ -72,7 +72,7 @@ python run_generator.py lerp-video \
 ![2x2-lerp](./docs/gifs/2x2-lerp.gif)
 
 <a name="style"></a>
-### Style mixing
+### Style mixing video
 
 Harkening to StyleGAN's [style mixing figure](https://github.com/NVlabs/stylegan/blob/66813a32aac5045fcde72751522a0c0ba963f6f2/generate_figures.py#L59), we can also mix different styles from the source image `--row-seed` onto the destination image `--col-seeds`:
 
@@ -202,6 +202,29 @@ Usage:
 where `name-of-dataset` will be the name of your dataset in your `/dataset/root/path` (the same terminology we use whilst projecting images or training the model), `/models/root/path` will be the path to the directory with all the models you wish to project, and `N` is the number of images you wish to project per `pkl` file (model checkpoint).
 
 Note that, by default, we will have `--num-snapshots=1`, as we are only interested in the final projection. As a side effect, this will speed up the projection by ~3x at least from my experience: from around 12 minutes to 4 minutes per image projected on an [NVIDIA 1080 GTX](https://www.geforce.com/hardware/desktop-gpus/geforce-gtx-1080/specifications).
+
+## Saving projected disentangled latent vectors
+
+On the other hand, if you wish to save the latent vector that is obtained by the projection, I've modified the code to allow you to do this. You must also decide how many steps to take (`--num-steps=1000`), how many snapshots to take of the process (`--num-snapshots=1000`), and finally if you wish to save the disentangled latent vectors at every step, or just the final one (with the respective flags `--save-every-step` and `--save-final-step`). For example, for generated images:
+
+```
+python run_projector.py project-generated-images \
+    --network=/path/to/network/pkl \
+    --num-steps=100
+    --num-snapshots=5 \
+    --seeds=0,3-10,99 \
+    --save-every-step
+```
+
+This will produce, for each of the selected seeds (in this case, `0,3,4,5,6,7,8,9,10,99`), 5 different snapshots (images) at steps `20`, `40`, `60`, `80`, and `100`, along with saving the disentangled latent vector that produces the projected images in these snapshots. These vectors will be saved in the respective run in the following manner: `seed0000-step0020.npy`, `seed0000-step0040.npy`, etc. If instead of `--save-every-step` you use `--save-final-step`, then in the above case, only the `seed0000-step0100.npy` will be saved. These options are available for both generated and real images, so use them as you please.
+
+Finally, using the same `pkl` file to load the `Gs` as in the projection, you can use these saved files to generate the image like so:
+
+```python
+dlatent = np.load('/results/00001-project-generated-images/seed0000-step0020.npy')
+
+image = Gs.components.synthesis.run(dlatent, **Gs_syn_kwargs)
+```
 
 ---
 

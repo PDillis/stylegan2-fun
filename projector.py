@@ -14,8 +14,8 @@ from training import misc
 #----------------------------------------------------------------------------
 
 class Projector:
-    def __init__(self):
-        self.num_steps                  = 1000
+    def __init__(self, num_steps=1000):
+        self.num_steps                  = num_steps  # User can now specify on the command line how many steps to take
         self.dlatent_avg_samples        = 10000
         self.initial_learning_rate      = 0.1
         self.initial_noise_factor       = 0.05

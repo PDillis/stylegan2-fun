@@ -15,11 +15,12 @@ import dnnlib.tflib as tflib
 
 import re
 import sys
-
 import os
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 import pretrained_networks
+
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+import moviepy.editor
 
 #----------------------------------------------------------------------------
 
@@ -86,7 +87,7 @@ def style_mixing_example(network_pkl, row_seeds, col_seeds, truncation_psi, col_
 
     # Sanity check: styles are actually possible for generated image size
     max_style = int(2 * np.log2(Gs.output_shape[-1])) - 3
-    assert max(col_styles) <= max_style, "Maximum col-style allowed: {}".format(max_style)
+    assert max(col_styles) <= max_style, f"Maximum col-style allowed: {max_style}"
 
     Gs_syn_kwargs = dnnlib.EasyDict()
     Gs_syn_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
@@ -203,8 +204,6 @@ def lerp_video(
             grid = grid.repeat(3, 2)
         return grid
 
-    import moviepy.editor
-
     # Generate video using make_frame:
     print('Generating interpolation video...')
     videoclip = moviepy.editor.VideoClip(make_frame, duration=duration_sec)
@@ -237,7 +236,7 @@ def style_mixing_video(
 
     # Sanity check: styles are actually possible for generated image size
     max_style = int(2 * np.log2(Gs.output_shape[-1])) - 3
-    assert max(col_styles) <= max_style, "Maximum col-style allowed: {}".format(max_style)
+    assert max(col_styles) <= max_style, f"Maximum col-style allowed: {max_style}"
 
     Gs_syn_kwargs = dnnlib.EasyDict()
     Gs_syn_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
@@ -298,8 +297,6 @@ def style_mixing_video(
                     ((col + 1) * H, (row + 1) * W),
                 )
         return np.array(canvas)
-
-    import moviepy.editor
 
     # Generate video using make_frame:
     print('Generating style-mixed video...')
@@ -389,8 +386,6 @@ def sightseeding(
             grid = grid.repeat(3, 2)
         return grid
 
-    import moviepy.editor
-
     # Generate video using make_frame:
     print('Generating sightseeding video...')
     videoclip = moviepy.editor.VideoClip(make_frame, duration=duration_sec)
@@ -401,6 +396,84 @@ def sightseeding(
                               fps=mp4_fps,
                               codec=mp4_codec,
                               bitrate=mp4_bitrate)
+
+#----------------------------------------------------------------------------
+
+def circular_video(network_pkl,
+                   seed,
+                   grid_w,
+                   grid_h,
+                   truncation_psi=1.0,
+                   duration_sec=30.0,
+                   mp4_fps=30,
+                   mp4_codec="libx264",
+                   mp4_bitrate="16M",
+                   minibatch_size=8,
+                   radius=10.0):
+    # Total number of frames (round to nearest integer then convert to int)
+    num_frames = int(np.rint(duration_sec * mp4_fps))
+    print('Loading network from "%s"...' % network_pkl)
+    _G, _D, Gs = pretrained_networks.load_networks(network_pkl)
+
+    # Define the kwargs for the Generator
+    Gs_kwargs = dnnlib.EasyDict()
+    Gs_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8, 
+                                      nchw_to_nhwc=True)
+    Gs_kwargs.randomize_noise = False
+    if truncation_psi is not None:
+        Gs_kwargs.truncation_psi = truncation_psi
+    
+    grid_size = [grid_w, grid_h]
+    # Get the latents with the random state
+    random_state = np.random.RandomState(seed)
+    # Choose two random dims on which to get the circles (from 0 to 511)
+    z1, z2 = np.split(random_state.choice(Gs.input_shape[1], 
+                                          2 * np.prod(grid_size),
+                                          replace=False), 2)
+
+    # We partition the circle in equal strides w.r.t. num_frames
+    def get_angles(num_frames):
+        angles = np.linspace(0, 2 * np.pi, num_frames)
+        return angles
+    angles = get_angles(num_frames=num_frames)
+
+    # Basic Polar to Cartesian transformation
+    def get_z_coords(radius, theta):
+        return radius * np.cos(theta), radius * np.sin(theta)
+    Z1, Z2 = get_z_coords(radius=radius, theta=angles)
+
+    # Create hte shape of the latents
+    shape = [num_frames, np.prod(grid_size)] + Gs.input_shape[1:]
+    # Create the latents comprising solely of zeros
+    all_latents = np.zeros(shape).astype(np.float32)
+    # We will obtain all the frames belonging to the specific scene/box in the
+    # grid, so then we replace the values of zeros with our circle values
+    for box in range(np.prod(grid_size)):
+        box_frames = all_latents[:, box]
+        box_frames[:, [z1[box], z2[box]]] = np.vstack((Z1, Z2)).T
+
+    # Aux function: Frame generation function for moviepy
+    def make_frame(t):
+        frame_idx = int(np.clip(np.round(t * mp4_fps), 0, num_frames - 1))
+        latents = all_latents[frame_idx]
+        # Get the images (with labels = None)
+        images = Gs.run(latents, None, **Gs_kwargs)
+        # Generate the grid for this timestamp
+        grid = create_image_grid(images, grid_size)
+        # grayscale => RGB
+        if grid.shape[2] == 1:
+            grid = grid.repeat(3, 2)
+        return grid
+
+    # Generate video using make_frame
+    print('Generating circular interpolation video...')
+    videoclip = moviepy.editor.VideoClip(make_frame, duration=duration_sec)
+    mp4 = f"{grid_w}x{grid_h}-circular.mp4"
+    videoclip.write_videofile(dnnlib.make_run_dir_path(mp4),
+                              fps=mp4_fps,
+                              codec=mp4_codec,
+                              bitrate=mp4_bitrate)
+
 
 #----------------------------------------------------------------------------
 
@@ -490,6 +563,9 @@ _examples = '''examples:
   
   # Generate sightseeding video (1x1), with 5-second interpolation between seeds, looping back to the first seed in the end
   python %(prog)s sightseeding --network=gdrive:networks/stylegan2-ffhq-config-f.pkl --seeds=4,9,7,5,4,6,8  --loop=True 
+
+  # Generate 50-second long 2x1 circular interpolation video, at 60 fps (Z-planes will be generated with the seed=1000):
+  python %(prog)s circular-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl --seed=1000 --grid-w=2 --grid-h=1 --duration-sec=50 --fps=60
 '''
 
 #----------------------------------------------------------------------------
@@ -549,6 +625,16 @@ Run 'python %(prog)s <subcommand> --help' for subcommand help.''',
     parser_sightseeding.add_argument('--fps', type=int, help='FPS of generated video (default: %(default)s)', default=30, dest='mp4_fps')
     parser_sightseeding.add_argument('--result-dir', help='Root directory for run results (default: %(default)s)', default='results', metavar='DIR')
 
+    parser_circular_video = subparsers.add_parser('circular-video', help='Generate circular interpolation video between random vectors')
+    parser_circular_video.add_argument('--network', help='Path to network pickle filename', dest='network_pkl', required=True)
+    parser_circular_video.add_argument('--seed', type=int, help='Random seed', dest='seed', required=True)
+    parser_circular_video.add_argument('--grid-w', type=int, help='Video grid width/no. of columns (default: %(default)s)', default=3, dest='grid_w')
+    parser_circular_video.add_argument('--grid-h', type=int, help='Video grid height/no of rows (default: %(default)s)', default=2, dest='grid_h')
+    parser_circular_video.add_argument('--truncation-psi', type=float, help='Trncation psi (default: %(default)s)', default=1.0, dest='truncation_psi')
+    parser_circular_video.add_argument('--duration-sec', type=float, help='Duration of video (default: %(default)s)', default=30.0, dest='duration_sec')
+    parser_circular_video.add_argument('--fps', type=int, help='FPS of generated video (default: %(default)s)', default=30, dest='mp4_fps')
+    parser_circular_video.add_argument('--result-dir', help='Root directory for run results (default: %(default)s)', default='results', metavar='DIR')
+
     args = parser.parse_args()
     kwargs = vars(args)
     subcmd = kwargs.pop('command')
@@ -569,7 +655,8 @@ Run 'python %(prog)s <subcommand> --help' for subcommand help.''',
         'style-mixing-example': 'run_generator.style_mixing_example',
         'lerp-video': 'run_generator.lerp_video',
         'style-mixing-video': 'run_generator.style_mixing_video',
-        'sightseeding': 'run_generator.sightseeding'
+        'sightseeding': 'run_generator.sightseeding',
+        'circular-video': 'run_generator.circular_video'
     }
     dnnlib.submit_run(sc, func_name_map[subcmd], **kwargs)
 
