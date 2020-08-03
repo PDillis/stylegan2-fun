@@ -1,20 +1,23 @@
 # Let's have fun with StyleGAN2!
 
-SOTA GANs can become cumbersome or even downright intimidating, if not daunting. StyleGAN2 is no different, especially when you consider the compute capabilities usually needed to fully train one model from scratch. This is what this repo is here for! My wish is that anyone can enjoy as much their trained models without the hassle of dealing with
+SOTA GANs can become cumbersome or even downright intimidating, if not daunting. StyleGAN2 is no different, especially when you consider the compute capabilities usually needed to fully train one model from scratch. This is what this repository is here for! My wish is that anyone can enjoy as much their trained models without the hassle of dealing with battling the code *that* much: you still have to put some sweat to create the videos you have envisioned, but it shouldn't be *unnecessary* sweat.
 
-We add some features to StyleGAN2's [official repo](#sgan2), so please get acquainted with it before delving deep into this branch. Take special attention to the  [Requirements](#requirements), in order for the code to run correctly. Should you encounter any errors, check out a possible solution in [Troubleshooting](#tshoot).
+We add some features to StyleGAN2's [official repo](#sgan2), so please get acquainted with the original one first before delving deep into this branch. Take special attention to the  [Requirements](#requirements), in order for the code to run correctly. Should you encounter any errors, check out a possible solution in [Troubleshooting](#tshoot).
 
 In essence,this repo adds two new features:
 * [Interpolation videos](#latent)
     * [Random vector interpolation](#lerp)
-    * [Style mixing](#style)
+    * [Style mixing video](#style)
+    * [Circular interpolation](#circular)
 * [Projection videos](#proj)
-    * Generate the projection video of a real or generated image
+    * [Mass Projector](#mass_proj)
+    * [Save projected videos](#save_proj)
 
-Two other changes have been made to the original repo, specifically also in `run_generator.py`:
+Two other changes have been made to the original repository, specifically also in `run_generator.py`:
 * When generating random images by seed number, you can now save them in a grid by adding `--grid=True`; the grid dimensions will be inferred by the number of `--seeds` you use
 * The `_parse_num_range(s)` function has been modified in order to accept any combination of comma separated numbers or ranges, or combination of both, i.e.: `--seeds=1,2,5-100,999-1004,123456` is now also accepted
-    * *Caution:* for `style-mixing-video`, for example, using too many `--col-seeds` will result in an OOM
+    * *Caution:* for `style-mixing-video`, for example, using too many `--col-seeds` will result in an OOM!
+
 <a name="tshoot"></a>
 ## Troubleshooting
 
@@ -71,6 +74,10 @@ python run_generator.py lerp-video \
 
 ![2x2-lerp](./docs/gifs/2x2-lerp.gif)
 
+In either of these cases, you might have a specific run where you think that a *slower* interpolation video might better show the capabilities of your trained network. For such cases, you can add `--slowdown=N`, where `N` is a power of 2 (default value is 1). This way, the video will be saved as `{grid-w}_{grid-h}-lerp-{N}xslowdown.mp4`. I apologize if the naming becomes confusing, but you can always rename your saved videos to however you like.
+
+This slowdown can be applied to any video type, so for now, I will only have it applied to this type of interpolation video, but be sure that it can be applied to the style mixing and circular interpolation videos.
+
 <a name="style"></a>
 ### Style mixing video
 
@@ -115,6 +122,11 @@ max_style = int(2 * np.log2(Gs.output_shape[-1])) - 3
 ```
 
 Which is used in the assertions at the beginning of the [`style_mixing_example`](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/run_generator.py#L83) and [`style_mixing_video`](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/run_generator.py#L232) functions.
+
+<a name="circular"></a>
+### Circular interpolation
+
+**TODO**
 
 <a name="proj"></a>
 ## Recreating the Projection Videos
@@ -187,6 +199,7 @@ An example of this is the following, where we are projecting a center-cropped im
 
 Watch the full size video [here](https://youtu.be/9-CUDF07cEE). For my purposes, there was no need to preserve each individual video (the projection and the target image, `left.mp4` and `right.mp4` respectively), so they are deleted at the end of the [bash script](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/projection_video.sh#L74). Remove this line if you wish to keep them. Furthermore, if you don't want any text to appear on the videos, remove the `-vf "drawtext=..."` flag from both lines [62](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/projection_video.sh#L62) and [67](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/projection_video.sh#L67).
 
+<a name="mass_proj"></a>
 ## Mass Projector
 
 Another tool that was useful for my purposes is `mass_projector.sh`. Given a directory with all the model checkpoints you wish to analyze, you can then project as many images as you wish per model checkpoint in order to do a comparison, such as calculating the PSNR, SSIM or MSE between the target final projected image.
@@ -203,6 +216,7 @@ where `name-of-dataset` will be the name of your dataset in your `/dataset/root/
 
 Note that, by default, we will have `--num-snapshots=1`, as we are only interested in the final projection. As a side effect, this will speed up the projection by ~3x at least from my experience: from around 12 minutes to 4 minutes per image projected on an [NVIDIA 1080 GTX](https://www.geforce.com/hardware/desktop-gpus/geforce-gtx-1080/specifications).
 
+<a name="save_proj"></a>
 ## Saving projected disentangled latent vectors
 
 On the other hand, if you wish to save the latent vector that is obtained by the projection, I've modified the code to allow you to do this. You must also decide how many steps to take (`--num-steps=1000`), how many snapshots to take of the process (`--num-snapshots=1000`), and finally if you wish to save the disentangled latent vectors at every step, or just the final one (with the respective flags `--save-every-step` and `--save-final-step`). For example, for generated images:

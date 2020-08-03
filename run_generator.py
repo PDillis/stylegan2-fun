@@ -35,7 +35,6 @@ def create_image_grid(images, grid_size=None):
     # Some sanity check:
     assert images.ndim == 3 or images.ndim == 4
     num, img_h, img_w = images.shape[0], images.shape[1], images.shape[2]
-
     if grid_size is not None:
         grid_w, grid_h = tuple(grid_size)
     else:
@@ -49,7 +48,6 @@ def create_image_grid(images, grid_size=None):
         x = (idx % grid_w) * img_w
         y = (idx // grid_w) * img_h
         grid[y : y + img_h, x : x + img_w, ...] = images[idx]
-
     return grid
 
 #----------------------------------------------------------------------------
@@ -134,19 +132,19 @@ def style_mixing_example(network_pkl, row_seeds, col_seeds, truncation_psi, col_
 
 #----------------------------------------------------------------------------
 
-def lerp_video(
-    network_pkl,                # Path to pretrained model pkl file
-    seeds,                      # Random seeds
-    grid_w=None,                # Number of columns
-    grid_h=None,                # Number of rows
-    truncation_psi=1.0,         # Truncation trick
-    duration_sec=30.0,          # Duration of video in seconds
-    smoothing_sec=3.0,
-    mp4_fps=30,
-    mp4_codec="libx264",
-    mp4_bitrate="16M",
-    minibatch_size=8,
-):
+def lerp_video(network_pkl,                # Path to pretrained model pkl file
+               seeds,                      # Random seeds
+               grid_w=None,                # Number of columns
+               grid_h=None,                # Number of rows
+               truncation_psi=1.0,         # Truncation trick
+               slowdown=1,                 # Slowdown of the video (power of 2)
+               duration_sec=30.0,          # Duration of video in seconds
+               smoothing_sec=3.0,
+               mp4_fps=30,
+               mp4_codec="libx264",
+               mp4_bitrate="16M",
+               minibatch_size=8):
+    assert slowdown & (slowdown - 1) == 0 and slowdown > 0, 'slowdown must be a power of 2 and greater than 0!'
     num_frames = int(np.rint(duration_sec * mp4_fps))
 
     print('Loading network from "%s"...' % network_pkl)
@@ -182,6 +180,33 @@ def lerp_video(
         mode="wrap"
     )
     all_latents /= np.sqrt(np.mean(np.square(all_latents)))
+    # Name of the final mp4 video
+    mp4 = f"{grid_w}x{grid_h}-lerp-{slowdown}xslowdown.mp4"
+    # Aux function to slowdown the video by 2x
+    def double_slowdown(latents, duration_sec, num_frames):
+        # Make an empty latent vector with double the amount of frames
+        z = np.empty(np.multiply(latents.shape, [2, 1, 1]), dtype=np.float32)
+        # Populate it
+        for i in range(len(latents)):
+            z[2*i] = latents[i]
+        # Interpolate in the odd frames
+        for i in range(1, len(z), 2):
+            # For the last frame, we loop to the first one
+            if i == len(z) - 1:
+                z[i] = (z[0] + z[i-1]) / 2
+            else:
+                z[i] = (z[i-1] + z[i+1]) / 2
+        # We also need to double the duration_sec and num_frames
+        duration_sec *= 2
+        num_frames *= 2
+        # Return the new latents, and the two previous quantities
+        return z, duration_sec, num_frames
+
+    while slowdown > 1:
+        all_latents, duration_sec, num_frames = double_slowdown(all_latents,
+                                                                duration_sec,
+                                                                num_frames)
+        slowdown //= 2
 
     # Define the kwargs for the Generator:
     Gs_kwargs = dnnlib.EasyDict()
@@ -207,7 +232,6 @@ def lerp_video(
     # Generate video using make_frame:
     print('Generating interpolation video...')
     videoclip = moviepy.editor.VideoClip(make_frame, duration=duration_sec)
-    mp4 = "{}x{}-lerp.mp4".format(*grid_size)
     videoclip.write_videofile(dnnlib.make_run_dir_path(mp4),
                               fps=mp4_fps,
                               codec=mp4_codec,
@@ -332,7 +356,7 @@ def sightseeding(
 
     # Number of steps to take between each latent vector
     n_steps = int(np.rint(seed_sec * mp4_fps))
-    # If we wish to return to the first latent, then we add it to the end 
+    # If we wish to return to the first latent, then we add it to the end
     if loop:
         seeds.append(seeds[0])
     # Number of frames in total
@@ -351,7 +375,7 @@ def sightseeding(
             w1, w2: numpy arrays (latent vectors)
             n_steps: number of steps to take between w1 and w2
         Output:
-            vectors: numpy array of latent vectors, without including w2 
+            vectors: numpy array of latent vectors, without including w2
         '''
         ratios = np.linspace(0, 1, num=n_steps, endpoint=False)
         vectors = list()
@@ -359,7 +383,7 @@ def sightseeding(
             w = (1.0 - ratio) * w1 + ratio * w2
             vectors.append(w)
         return np.asarray(vectors)
-    
+
     src_w = np.empty([0] + list(all_w.shape[1:]), dtype=np.float64)
     for i in range(len(all_w) - 1):
         # We interpolate between each pair of latents
@@ -417,17 +441,17 @@ def circular_video(network_pkl,
 
     # Define the kwargs for the Generator
     Gs_kwargs = dnnlib.EasyDict()
-    Gs_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8, 
+    Gs_kwargs.output_transform = dict(func=tflib.convert_images_to_uint8,
                                       nchw_to_nhwc=True)
     Gs_kwargs.randomize_noise = False
     if truncation_psi is not None:
         Gs_kwargs.truncation_psi = truncation_psi
-    
+
     grid_size = [grid_w, grid_h]
     # Get the latents with the random state
     random_state = np.random.RandomState(seed)
     # Choose two random dims on which to get the circles (from 0 to 511)
-    z1, z2 = np.split(random_state.choice(Gs.input_shape[1], 
+    z1, z2 = np.split(random_state.choice(Gs.input_shape[1],
                                           2 * np.prod(grid_size),
                                           replace=False), 2)
 
@@ -560,9 +584,9 @@ _examples = '''examples:
 
   # Generate style mixing example of fine styles layers (64^2-1024^2, as in StyleGAN)
   python %(prog)s style-mixing-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl --row-seed=85 --col-seeds=55,821,1789,293 --col-styles=8-17 --truncation-psi=1.0
-  
+
   # Generate sightseeding video (1x1), with 5-second interpolation between seeds, looping back to the first seed in the end
-  python %(prog)s sightseeding --network=gdrive:networks/stylegan2-ffhq-config-f.pkl --seeds=4,9,7,5,4,6,8  --loop=True 
+  python %(prog)s sightseeding --network=gdrive:networks/stylegan2-ffhq-config-f.pkl --seeds=4,9,7,5,4,6,8  --loop=True
 
   # Generate 50-second long 2x1 circular interpolation video, at 60 fps (Z-planes will be generated with the seed=1000):
   python %(prog)s circular-video --network=gdrive:networks/stylegan2-ffhq-config-f.pkl --seed=1000 --grid-w=2 --grid-h=1 --duration-sec=50 --fps=60
@@ -602,6 +626,7 @@ Run 'python %(prog)s <subcommand> --help' for subcommand help.''',
     parser_lerp_video.add_argument('--grid-w', type=int, help='Video grid width/columns (default: %(default)s)', default=None, dest='grid_w')
     parser_lerp_video.add_argument('--grid-h', type=int, help='Video grid height/rows (default: %(default)s)', default=None, dest='grid_h')
     parser_lerp_video.add_argument('--truncation-psi', type=float, help='Truncation psi (default: %(default)s)', default=1.0, dest='truncation_psi')
+    parser_lerp_video.add_argument('--slowdown', type=int, help='Slowdown the video by this amount; must be a power of 2 (default: %(default)s)', default=1, dest='slowdown')
     parser_lerp_video.add_argument('--duration-sec', type=float, help='Duration of video (default: %(default)s)', default=30.0, dest='duration_sec')
     parser_lerp_video.add_argument('--fps', type=int, help='FPS of generated video (default: %(default)s)', default=30, dest='mp4_fps')
     parser_lerp_video.add_argument('--result-dir', help='Root directory for run results (default: %(default)s)', default='results', metavar='DIR')
