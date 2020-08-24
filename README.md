@@ -127,7 +127,7 @@ Which is used in the assertions at the beginning of the [`style_mixing_example`]
 <a name="circular"></a>
 ### Circular interpolation
 
-A crude version of a circular interpolation video inspired by [Snowy Halcy](Snowy Halcy: https://github.com/halcy/stylegan/blob/master/Stylegan-Generate-Encode.ipynb).
+A crude version of a circular interpolation video inspired by [Lorenz Diener](https://github.com/halcy/stylegan/blob/master/Stylegan-Generate-Encode.ipynb).
 
 **TODO: Details and example GIF**
 
