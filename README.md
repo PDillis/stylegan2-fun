@@ -9,6 +9,7 @@ In essence,this repo adds two new features:
     * [Random vector interpolation](#lerp)
     * [Style mixing video](#style)
     * [Circular interpolation](#circular)
+    * [Sightseeding](#sightseeding)
 * [Projection videos](#proj)
     * [Mass Projector](#mass_proj)
     * [Save projected videos](#save_proj)
@@ -126,7 +127,16 @@ Which is used in the assertions at the beginning of the [`style_mixing_example`]
 <a name="circular"></a>
 ### Circular interpolation
 
-**TODO**
+A crude version of a circular interpolation video inspired by [Snowy Halcy](Snowy Halcy: https://github.com/halcy/stylegan/blob/master/Stylegan-Generate-Encode.ipynb).
+
+**TODO: Details and example GIF**
+
+<a name="sightseeding"></a>
+### Sightseeding
+
+If there's a list of `seeds` you wish to visit in the latent space, you can now pass this list of seeds and they will be visited in *order* (a bit jumpy at the moment, will correct with using e.g. slerp or other function).
+
+**TODO: Details and example GIF**
 
 <a name="proj"></a>
 ## Recreating the Projection Videos
