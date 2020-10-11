@@ -42,7 +42,9 @@ The bad news is that it doesn't always work, and it's not a *pretty* fix, but at
 <a name="latent"></a>
 ## Latent space exploration
 
-What is a trained GAN without a bit of latent space exploration? We can do the typical interpolation between random latent vectors, without the need to specify *which* random vectors. A new run will be added to the `./results` subdir each time you run the code with the pertinent name of the subcommand used (unless you change this path of course).
+What is a trained GAN without a bit of latent space exploration? We will use my [trained model on huipils from Guatemala and Mexico](https://youtu.be/GzHKtcPTKR4), `huipils.pkl`, as well as other models that can be found in [Justin Pinkney's](https://www.justinpinkney.com/) [ncredible repo](https://github.com/justinpinkney/awesome-pretrained-stylegan2). Make sure to visit it if you wish to start using one of the many available models!
+
+We can do the typical interpolation between random latent vectors, without the need to specify *which* random vectors. A new run will be added to the `./results` subdir each time you run the code with the pertinent name of the subcommand used (unless you change this path of course).
 
 <a name="lerp"></a>
 ### Random interpolation
