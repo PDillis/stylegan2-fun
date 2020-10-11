@@ -1,3 +1,6 @@
+
+**NOTE: This will be the last push, as I will migrate the code and project to [StyleGAN2-ADA](https://github.com/PDillis/stylegan2-ada).**
+
 # Let's have fun with StyleGAN2!
 
 SOTA GANs can become cumbersome or even downright intimidating, if not daunting. StyleGAN2 is no different, especially when you consider the compute capabilities usually needed to fully train one model from scratch. This is what this repository is here for! My wish is that anyone can enjoy as much their trained models without the hassle of dealing with battling the code *that* much: you still have to put some sweat to create the videos you have envisioned, but it shouldn't be *unnecessary* sweat.
@@ -8,8 +11,8 @@ In essence,this repo adds two new features:
 * [Interpolation videos](#latent)
     * [Random vector interpolation](#lerp)
     * [Style mixing video](#style)
-    * [Circular interpolation](#circular)
     * [Sightseeding](#sightseeding)
+    * [Circular interpolation](#circular)
 * [Projection videos](#proj)
     * [Mass Projector](#mass_proj)
     * [Save projected videos](#save_proj)
@@ -39,18 +42,18 @@ The bad news is that it doesn't always work, and it's not a *pretty* fix, but at
 <a name="latent"></a>
 ## Latent space exploration
 
-What is a trained GAN without a bit of latent space exploration? We can do the typical interpolation between random latent vectors, as well as some [style mixing](https://youtu.be/c-NJtV9Jvp0?t=145) as in the oficial repo, which we can of course recreate. A new run will be added to the `./results` subdir each time you run the code with the pertinent name of the subcommand used.
+What is a trained GAN without a bit of latent space exploration? We can do the typical interpolation between random latent vectors, without the need to specify *which* random vectors. A new run will be added to the `./results` subdir each time you run the code with the pertinent name of the subcommand used (unless you change this path of course).
 
 <a name="lerp"></a>
 ### Random interpolation
 
-A linear interpolation or [lerp](https://en.wikipedia.org/wiki/Linear_interpolation) is done between random vectors in ***Z***, which in turn will be mapped into ***W*** by the Generator. There are two options:
+A linear interpolation or [lerp](https://en.wikipedia.org/wiki/Linear_interpolation) is done between random vectors in ***Z***, which in turn will be mapped into ***W*** by the Generator. There are two options available:
 
 * Give a list of `--seeds` (in the form `a,b,c`, `a-b,c`, or even a combination `'a,b-c,d,e-f,...'`), and the code will infer the best width and height for the generated video. For example, we wish the seeds to be from `42` to `47` (inclusive), then we run:
 
 ```
 python run_generator.py lerp-video \
-    --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
+    --network=/path/to/huipils.pkl \
     --seeds=42-47
 ```
 
@@ -64,49 +67,47 @@ python run_generator.py lerp-video \
 
 ```
 python run_generator.py lerp-video \
-    --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
-    --seeds=1000 \
-    --grid-w=2 \
-    --grid-h=2 \
-    --truncation-psi=0.7 \
-    --fps=60 \
-    --duration-sec=15
+    --network=/path/to/huipils.pkl \
+    --seeds=1000 --grid-w=2 --grid-h=2 \
+    --truncation-psi=0.7 --fps=60 --duration-sec=15
 ```
 
 ![2x2-lerp](./docs/gifs/2x2-lerp.gif)
 
-In either of these cases, you might have a specific run where you think that a *slower* interpolation video might better show the capabilities of your trained network. For such cases, you can add `--slowdown=N`, where `N` is a power of 2 (default value is 1). This way, the video will be saved as `{grid-w}_{grid-h}-lerp-{N}xslowdown.mp4`. I apologize if the naming becomes confusing, but you can always rename your saved videos to however you like.
+In either of these cases, you might have a specific run where you think that a *slower* interpolation video might better show the capabilities of your trained network. That is, you wish to keep the generated path as is, but slowed down when viewing it in the video. This is what `--slowdown` is for.
 
-This slowdown can be applied to any video type, so for now, I will only have it applied to this type of interpolation video, but be sure that it can be applied to the style mixing and circular interpolation videos.
+#### Slowdown
+
+For such cases, you can add `--slowdown=N`, where `N` is a power of 2 (e.g., `1, 2, 4, 8, ...`, default value is `1`). This is why every lerp interpolation video is saved as `{grid-w}_{grid-h}-lerp-{N}xslowdown.mp4` in the respective `./results` subdir. I apologize if the naming becomes confusing, but you can always rename your saved videos to however you like. Quickly generating a 1x1 interpolation video, we then run:
+
+```
+python run_generator.py lerp-video \
+    --network=/path/to/huipils.pkl \
+    --seeds=7 --truncation-psi=0.7 --duration-sec=15\
+```
+
+We can see the result of this code if we add the following (remember, `--slowdown=1` is the default value):
+
+| `--slowdown=1` | `--slowdown=2` | `--slowdown=4` | `--slowdown=8` |
+| :-: | :-: | :-: | :-: |
+| ![1xslowdown](./docs/gifs/lerp-1xslowdown.gif) | ![2xslowdown](./docs/gifs/lerp-2xslowdown.gif) | ![4xslowdown](./docs/gifs/lerp-4xslowdown.gif) | ![8xslowdown](./docs/gifs/lerp-8xslowdown.gif) |
 
 <a name="style"></a>
 ### Style mixing video
 
-Harkening to StyleGAN's [style mixing figure](https://github.com/NVlabs/stylegan/blob/66813a32aac5045fcde72751522a0c0ba963f6f2/generate_figures.py#L59), we can also mix different styles from the source image `--row-seed` onto the destination image `--col-seeds`:
+We can recreate the [style mixing video](https://youtu.be/c-NJtV9Jvp0?t=145) by specifying which styles from the source image (`--row-seed`, which will generate a [lerp](#lerp) video using said seed) we want to replace in the destination image (`--col-seeds`, which will fix the images using these seeds per column):
 
 ```
 python run_generator.py style-mixing-video \
     --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
-    --col-seeds=55,821,1789,293 \
-    --row-seed=85
+    --col-seeds=55,293,821,1789,293 --row-seed=85
 ```
 
 ![style-mixing](./docs/gifs/4x1-style-mixing.gif)
 
  By default, we will have that `--truncation-psi=0.7`, `--duration-sec=30.0`, `--fps=30`, and `--col-styles=0-6`, which indicates that we will use the styles from layers 4x4 up to the first layer of the 32x32 (remember there are two per layer).
 
- For example, if you wish to only apply the **fine styles** (from 64x64 up to 1024x1024 as defined in the [StyleGAN paper](https://arxiv.org/abs/1812.04948)) from the `--row-seed` onto the `--col-seeds`, run:
-
-```
-python run_generator.py style-mixing-video \
-    --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
-    --col-seeds=55,821,1789,293 \
-    --row-seed=85 \
-    --col-styles=8-17
-```
-![style-mixing-fine](./docs/gifs/4x1-style-mixing-fine.gif)
-
-In essence, we will replace the selected styles from the `--col-seeds` with the styles from the `--row-seed`. So, if you wish to apply the **coarse styles** defined in the StyleGAN paper, you must use `--col-styles=0-3`; for the **middle styles**, use `--col-styles=4-7`; and finally, for the **fine styles**, use `--col-styles=8-max_style`, where `max_style` will depend on the generated image size of your model. The following table gives a small summary of this value:
+As stated before, we will replace the selected `--col-styles` from the `--col-seeds` with the respective styles from the `--row-seed`. So, if you wish to apply the **coarse styles** defined in the [StyleGAN paper](https://arxiv.org/abs/1812.04948), you can use `--col-styles=0-3`; for the **middle styles**, use `--col-styles=4-7`; and finally, for the **fine styles**, use `--col-styles=8-max_style`, where `max_style` will depend on the generated image size of your model. The following table gives a small summary of this value:
 
 | `Gs.ouptut_shape[-1]` | `max_style` |
 | --- | --- |
@@ -122,64 +123,138 @@ I hope you get the gist of it or, if you wish to make it truly independent of an
 max_style = int(2 * np.log2(Gs.output_shape[-1])) - 3
 ```
 
-Which is used in the assertions at the beginning of the [`style_mixing_example`](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/run_generator.py#L83) and [`style_mixing_video`](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/run_generator.py#L232) functions.
+Which is used in the assertions at the beginning of the `style_mixing_example` and `style_mixing_video` functions.
 
-<a name="circular"></a>
-### Circular interpolation
+To visualize how these different `--col-styles` are replaced, the following table will be generated with the code:
 
-A crude version of a circular interpolation video inspired by [Lorenz Diener](https://github.com/halcy/stylegan/blob/master/Stylegan-Generate-Encode.ipynb).
+```
+python run_generator.py style-mixing-video \
+   --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
+   --col-seeds=55,821,1789,293 --row-seed=85
+```
 
-**TODO: Details and example GIF**
+We just need to add the styles to replace, which can be found in the first column:
+
+| Styles to replace |  Result |
+| :-: | :-: |
+| `--col-styles=0-3` | ![style-mixing-coarse](./docs/gifs/4x1-style-mixing-coarse.gif) |
+| `--col-styles=4-7` | ![style-mixing-middle](./docs/gifs/4x1-style-mixing-middle.gif) |
+| `--col-styles=8-17` | ![style-mixing-fine](./docs/gifs/4x1-style-mixing-fine.gif) |
+
+Of course, more wacky combinations of `--col-styles` (for example, `--col-styles=1,5-8,13`) can be made, so long as the final result is satisfactory to your needs. Be sure to understand *what* the specific styles are doing in your model, as this will be key for you to know what you wish to transfer.
+
+On the other hand, if you only wish to show the result of the style mixing (i.e., the images in the second row, second column onward), then you can add the `--only-stylemix` flag. In the following example, we will transfer only the fine layers, so the resulting image will only be changing color, not the general identity of the generated person:
+
+```
+python run_generator.py style-mixing-video \
+   --network=gdrive:networks/stylegan2-ffhq-config-f.pkl \
+   --col-seeds=1769 --row-seed=85 \
+   --col-styles=8-17 --only-stylemix
+```
+
+![onlymix](./docs/gifs/1x1-style-mixing_onlymix.gif)
 
 <a name="sightseeding"></a>
 ### Sightseeding
 
-If there's a list of `seeds` you wish to visit in the latent space, you can now pass this list of seeds and they will be visited in *order* (a bit jumpy at the moment, will correct with using e.g. slerp or other function).
+Running `python run_generator.py generate-images`, you might've encountered a set of `--seeds` that you wish to further explore in the latent space. To this end is this code, as we can now visit a list of user-specified `seeds` and they will be visited ***in order*** by interpolating between them.
 
-**TODO: Details and example GIF**
+Using the unofficial [Metfaces model](https://github.com/justinpinkney/awesome-pretrained-stylegan2#painting-faces), we can thus travel between 4 different seeds like so:
+
+```
+python run_generator.py sightseeding \
+    --network=/path/to/metfaces.pkl \
+    --seeds=161-163,83,161 \
+    --truncation-psi=0.7 --seed-sec=5.0
+```
+
+Note we add the first seed back at the end in order to create a loop. Now, we need to add also which type of interpolation to make (`--interp-type`): a [`linear`](https://en.wikipedia.org/wiki/Linear_interpolation) or [`spherical`](https://en.wikipedia.org/wiki/Slerp) interpolation between the generated latent vectors. Likewise, we can perform this interpolation either in ***Z*** (`--interp-in-z=True`) or ***W*** (`--interp-in-z=False`). Irrespective of these two options, we can add the flag `--smooth` in order to smoothly interpolate between the latent vectors. This is useful if your model is too *jumpy* when reaching the different seeds, so use it as you please.
+
+The results of the previous code along with these different parameters can be seen in the following tables:
+
+| `--interp-in-z=True` |  | `--smooth` |
+| :-: | :-: | :-: |
+| `--interp-type=linear` | ![sightseeding-z-linear](./docs/gifs/sightseeding-linear_z.gif) | ![sightseeding-z-smooth](./docs/gifs/sightseeding-smooth-linear_z.gif) |
+| `--interp-type=spherical` | ![sightseeding-z-spherical](./docs/gifs/sightseeding-spherical_z.gif) | ![sightseeding-z-spherical](./docs/gifs/sightseeding-smooth-spherical_z.gif) |
+
+| `--interp-in-z=False` |  | `--smooth` |
+| :-: | :-: | :-: |
+| `--interp-type=linear` | ![sightseeding-w-linear](./docs/gifs/sightseeding-linear_w.gif) | ![sightseeding-w-smooth](./docs/gifs/sightseeding-smooth-linear_w.gif) |
+| `--interp-type=spherical` | ![sightseeding-w-spherical](./docs/gifs/sightseeding-spherical_w.gif) | ![sightseeding-w-spherical](./docs/gifs/sightseeding-smooth-spherical_w.gif) |
+
+As we can see, the transition between the seeds will be different depending on both of these settings, so you should play with these in order to get exactly what you want to show. In general, I've found that spherical interpolation in ***W*** is already smooth enough, but you can always use the `--smooth` whenever you please.
+
+<a name="circular"></a>
+### Circular interpolation
+
+This is a crude version of a circular interpolation video inspired by [Lorenz Diener](https://github.com/halcy/stylegan/blob/master/Stylegan-Generate-Encode.ipynb). We do the following:
+
+* Two dimensions `z1, z2` in ***Z*** will be chosen at random (defined by the `seed`), on which we will define a plane
+
+* On it, we will then define a circle of radius `radius=10.0` centered at the origin. We partition it in equal strides via polar coordinates with the total number of frames `num_frames = int(np.rint(duration_sec * mp4_fps))` as steps. Hence, the longer the video length and higher the FPS, the smaller the step.
+
+* We fill the entire latent space with zeros and then replace the values of the points in the circle with their Cartesian values, starting at `(10.0, 0.0)` and moving counter-clockwise.
+
+    * Note that the value for the `radius` does not really matter, as we are only changing the value of *one* of the `512` dimensions in ***Z*** whilst keeping everything else as zero. I do not recommend changing this value, though other types of trajectories can be made, akin to Mario Klingemann's [Hyperdimensional Attractions](http://www.aiartonline.com/highlights/mario-klingemann-3/).
+
+Using the [Wikiart model](https://github.com/justinpinkney/awesome-pretrained-stylegan2#WikiArt), we run the following:
+
+```
+python run_generator.py circular-video \
+    --network=/path/to/wikiart.pkl \
+    --seed=70 --grid-w=2 --grid-h=1 \
+    --truncation-psi=0.7
+```
+We must also add how long the video will last, `--duration-sec`, though as usual the default value will be 30 seconds. I recommend using a low value first in order to see if the determined path is worthy of exploring. If it is, then using a larger video length would better reveal the details generated, again as long as it suits your needs.
+
+| `--duration-sec=5.0` | `--duration-sec=20.0` | `--duration-sec=60.0` |
+| :-: | :-: | :-: |
+| ![circular-video1](./docs/gifs/2x1-circular-5s.gif) | ![circular-video2](./docs/gifs/2x1-circular-20s.gif) | ![circular-video3](./docs/gifs/2x1-circular-60s.gif) |
+
+All in all, this is akin to the `--slowdown` parameter in the [lerp](#lerp) interpolation videos above, albeit in a much more controlled way as the path is set from the beginning.
+
+   * **TODO:** add style transfer and optionally let the user decide in which plane to do generate the circle.
 
 <a name="proj"></a>
 ## Recreating the Projection Videos
 
-To generate your own projection videos [as in the official implementation](https://drive.google.com/open?id=1ZpEiQuUFm4XQRUxoJj3f4O8-f102iXJc), you must of course have to have a projection in your `results` subdir!
+To generate your own projection videos [as in the official implementation](https://drive.google.com/open?id=1ZpEiQuUFm4XQRUxoJj3f4O8-f102iXJc), you must of course have to have already a projection in your `results` subdir! As a side note, I must put emphasis on the fact that **you can use either a trained model.pkl from StyleGAN or StyleGAN2**, so this projection code can be used for your *old* StyleGAN models as well, which I found useful as the majority of my work was done with StyleGAN.
 
 For example, to project generated images by your trained model, run:
 
 ```
 python run_projector.py project-generated-images \
-    --network=/path/to/network/pkl \
+    --network=/path/to/network.pkl \
     --num-snapshots=1000 \
     --seeds=....
 ```
 
-where, if you know specific seeds that you wish to project, include it in the argument.
+where, if you know specific seeds that you wish to project, include it in the `--seeds` argument.
 
-To project real images, these must be in a `tfrecord` file, so the easiest thing to do is to use the file you used to train your [StyleGAN](https://github.com/NVlabs/stylegan) or StyleGAN2 model. As a side note, I must put emphasis on the fact that **you can use either a trained model.pkl from StyleGAN or StyleGAN2**, so this projection code can be used for your *old* StyleGAN models as well, which I found useful as the majority of my work was done with StyleGAN.
+To project real images, these must be in a `tfrecord` file, so the easiest thing to do is to use the file you used to train your [StyleGAN](https://github.com/NVlabs/stylegan) or StyleGAN2 model.
 
 Then, to project real images, run:
 
 ```
 python run_projector.py project-real-images \
-    --network=/path/to/network/pkl \
+    --network=/path/to/network.pkl \
     --data-dir=/path/to/tfrecord/root/dir \
     --dataset=tfrecord_name \
     --num-snapshots=1000 \
     --num-images=N(as many as you wish/have the time)
 ```
 
-Take heed that, if you run the above code, say, two times, with the first time setting `--num-images 5` and the second time setting `--num-images 10`, then the first run will be contained in the second, as they will have the same seed. As such, if you wish to project a specific set of real images from your training data, then simply convert these to a `tfrecord` file with `dataset_tool.py` and you don't have to worry about when you will get the specific image(s) you want to project.
+Take heed that, if you run the above code, say, two times, with the first time setting `--num-images=5` and the second time setting `--num-images=10`, then the first run will be contained in the second, as they will have the same seed. As such, if you wish to project a specific set of real images from your training data, then simply convert these to a `tfrecord` file with `dataset_tool.py` and you don't have to worry about when you will get the specific image(s) you want to project.
 
-Note that `--num-snapshots 1000` is required for the bash script below, as the final video will be of length of 20 seconds, and will run at 50 fps. Modifying this and in turn the length of the projection video is not so complicated, so feel free to so, but remember to modify **both** numbers.
+Note that `--num-snapshots=1000` is required for the bash script below, as the final video will be of length of 20 seconds, and will run at 50 fps. Modifying this and in turn the length of the projection video is not so complicated, so feel free to so, but remember to modify **both** numbers.
 
-So now you just have to run:
+So now, in the `stylegan2-fun` dir, you just have to run:
 
 ```
 ./projection_video.sh 1
 ```
 
-if, for example, your Run 1 was a projection of real or generated images, i.e., the directory in `results` is `00001-project-generated-images` or `00001-project-real-images`.
-
-The result of this bash script will be that your images will be sorted in subdirectories in each run by either seed or real image number, like so:
+if, for example, your Run 1 was a projection of real or generated images, i.e., there exists either `00001-project-generated-images` or `00001-project-real-images` in `results`. The result of this bash script will be that your images will be sorted in subdirectories in each run by either seed or real image number, like so:
 
 ```
 ./results/00001-project-real-images
@@ -207,7 +282,7 @@ An example of this is the following, where we are projecting a center-cropped im
 
 ![projection-video](./docs/gifs/image0001-projection.gif)
 
-Watch the full size video [here](https://youtu.be/9-CUDF07cEE). For my purposes, there was no need to preserve each individual video (the projection and the target image, `left.mp4` and `right.mp4` respectively), so they are deleted at the end of the [bash script](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/projection_video.sh#L74). Remove this line if you wish to keep them. Furthermore, if you don't want any text to appear on the videos, remove the `-vf "drawtext=..."` flag from both lines [62](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/projection_video.sh#L62) and [67](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/projection_video.sh#L67).
+Watch the full size video [here](https://youtu.be/9-CUDF07cEE). For my purposes, there was no need to preserve each individual video (the projection and the target image, `left.mp4` and `right.mp4` respectively in `projection_video.sh`), so they are deleted at the [end of the script](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/projection_video.sh#L74). Remove this line if you wish to keep them. Furthermore, if you don't want any text to appear on the videos, remove the `-vf "drawtext=..."` flag from both lines [62](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/projection_video.sh#L62) and [67](https://github.com/PDillis/stylegan2-fun/blob/a6d9840bb23702d9450e1dc0debcba6f4f50b218/projection_video.sh#L67).
 
 <a name="mass_proj"></a>
 ## Mass Projector
@@ -222,25 +297,27 @@ Usage:
 ./mass_projector.sh name-of-dataset /dataset/root/path /models/root/path N
 ```
 
-where `name-of-dataset` will be the name of your dataset in your `/dataset/root/path` (the same terminology we use whilst projecting images or training the model), `/models/root/path` will be the path to the directory with all the models you wish to project, and `N` is the number of images you wish to project per `pkl` file (model checkpoint).
+where `name-of-dataset` will be the name of your dataset in your `/dataset/root/path` (the same terminology we use whilst projecting images or training the model), `/models/root/path` will be the path to the directory containing all the `pkl` files that you wish to project `N` images from the dataset.
 
 Note that, by default, we will have `--num-snapshots=1`, as we are only interested in the final projection. As a side effect, this will speed up the projection by ~3x at least from my experience: from around 12 minutes to 4 minutes per image projected on an [NVIDIA 1080 GTX](https://www.geforce.com/hardware/desktop-gpus/geforce-gtx-1080/specifications).
 
 <a name="save_proj"></a>
 ## Saving projected disentangled latent vectors
 
-On the other hand, if you wish to save the latent vector that is obtained by the projection, I've modified the code to allow you to do this. You must also decide how many steps to take (`--num-steps=1000`), how many snapshots to take of the process (`--num-snapshots=1000`), and finally if you wish to save the disentangled latent vectors at every step, or just the final one (with the respective flags `--save-every-step` and `--save-final-step`). For example, for generated images:
+On the other hand, if you wish to save the latent vector that is obtained by the projection, I've modified the code to allow you to do this. You must also decide how many steps to take (`--num-steps`), how many snapshots to take of the process (`--num-snapshots`), and finally if you wish to save the disentangled latent vectors at every step (`--save-every-dlatent`) or just the final one (`--save-final-dlatent`). These disentangled latent vectores will be saved in the [`npy` format](https://numpy.org/doc/stable/reference/generated/numpy.lib.format.html#module-numpy.lib.format).
+
+For example, for generated images:
 
 ```
 python run_projector.py project-generated-images \
-    --network=/path/to/network/pkl \
-    --num-steps=100
-    --num-snapshots=5 \
-    --seeds=0,3-10,99 \
-    --save-every-step
+    --network=/path/to/network.pkl \
+    --num-steps=100 --num-snapshots=5 \
+    --seeds=0,3-10,99 --save-every-dlatent
 ```
 
-This will produce, for each of the selected seeds (in this case, `0,3,4,5,6,7,8,9,10,99`), 5 different snapshots (images) at steps `20`, `40`, `60`, `80`, and `100`, along with saving the disentangled latent vector that produces the projected images in these snapshots. These vectors will be saved in the respective run in the following manner: `seed0000-step0020.npy`, `seed0000-step0040.npy`, etc. If instead of `--save-every-step` you use `--save-final-step`, then in the above case, only the `seed0000-step0100.npy` will be saved. These options are available for both generated and real images, so use them as you please.
+This will produce, for each of the selected seeds (in this case, `0,3,4,5,6,7,8,9,10,99`), 5 different snapshots (images) at steps `20`, `40`, `60`, `80`, and `100`, along with saving the disentangled latent vector that produces the projected images in these snapshots. These vectors will be saved in the respective run in the following manner: `seed0000-step0020.npy`, `seed0000-step0040.npy`, etc. If instead of `--save-every-dlatent` you use `--save-final-dlatent`, then in the above case, only the `seed0000-step0100.npy` will be saved. These options are available for both generated and real images, so use them as you please.
+
+For the generated images, you can also save the target disentangled latent vector by adding the `--save-target-dlatent` flag. This is of course not particularly essential, as you can always generate these disentangled vectors by the respective seed, but it's something that was useful for me and I hope it is useful for someone else.
 
 Finally, using the same `pkl` file to load the `Gs` as in the projection, you can use these saved files to generate the image like so:
 
@@ -248,6 +325,8 @@ Finally, using the same `pkl` file to load the `Gs` as in the projection, you ca
 dlatent = np.load('/results/00001-project-generated-images/seed0000-step0020.npy')
 
 image = Gs.components.synthesis.run(dlatent, **Gs_syn_kwargs)
+
+img = PIL.Image.fromarray(image, "RGB")
 ```
 
 ---
